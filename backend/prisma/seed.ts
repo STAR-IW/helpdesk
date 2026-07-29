@@ -1,7 +1,7 @@
 
 
 
-import 'dotenv/config';
+import '../src/load-env.js';
 import { randomUUID } from 'node:crypto';
 import { hashPassword } from 'better-auth/crypto';
 import { prisma } from '../src/db.js';
