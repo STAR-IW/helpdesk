@@ -21,6 +21,7 @@ lerna-debug.log*
 
 # Local Claude Code config
 .claude/
+.agents/
 skills-lock.json
 
 # Editor / OS

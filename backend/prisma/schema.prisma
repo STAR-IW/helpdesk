@@ -12,6 +12,11 @@ datasource db {
   provider = "postgresql"
 }
 
+enum Role {
+  admin
+  agent
+}
+
 model User {
   id            String    @id
   name          String
@@ -23,7 +28,8 @@ model User {
   sessions      Session[]
   accounts      Account[]
 
-  @@unique([email])
+  role Role @default(agent)
+
   @@map("user")
 }
 
