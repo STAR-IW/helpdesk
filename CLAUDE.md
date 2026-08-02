@@ -29,10 +29,14 @@ Frontend (`cd frontend`):
 - Auth uses database-backed sessions (session id in an HTTP-only cookie, session record in Postgres) — not JWT. This is intentional, to allow server-side session revocation.
 - AI features (ticket classification, auto-response, summaries, suggested replies) call the Anthropic API server-side only, from the backend — never from the frontend.
 - Frontend and backend are separate processes/origins; backend has `cors()` enabled for local cross-origin requests.
+- Frontend UI components use shadcn/ui (`base-nova` style, `neutral` base color, Base UI primitives, Tailwind v4 CSS-based theming — no `tailwind.config.js`). Config lives in `frontend/components.json`; theme tokens/colors are in `frontend/src/index.css`.
+- `@/*` resolves to `frontend/src/*` (path alias set in `tsconfig.json`, `tsconfig.app.json`, and `vite.config.ts`).
+- To add more shadcn components: `cd frontend && npx shadcn@latest add <component>`.
 
 ## Gotchas
 
 - Backend's `typescript` is pinned to `^5.9.3`, not the latest major — `typescript-eslint` doesn't support TypeScript 7 yet (peer range `<6.1.0`). Don't bump backend TypeScript past that range without checking `typescript-eslint`'s peer support first.
+- Always run `npm install` from inside `/frontend` or `/backend`, never from the repo root — the repo root has no `package.json` of its own. 
 
 ## Working with libraries/frameworks
 
