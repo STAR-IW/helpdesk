@@ -2,8 +2,15 @@ import type { ReactNode } from 'react'
 import { Navigate } from 'react-router'
 import { useSession } from '../lib/auth-client'
 
-export function ProtectedRoute({ children }: { children: ReactNode }) {
-  const { data: session, isPending } = useSession()
+export function ProtectedRoute({
+  children,
+  role,
+}: {
+  children: ReactNode
+  role?: string
+}) {
+  const { data:
+      session, isPending } = useSession()
 
   if (isPending) {
     return (
@@ -15,6 +22,10 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
 
   if (!session) {
     return <Navigate to="/login" replace />
+  }
+
+  if (role && session.user.role !== role) {
+    return <Navigate to="/" replace />
   }
 
   return <>{children}</>

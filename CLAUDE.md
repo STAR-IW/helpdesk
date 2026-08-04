@@ -35,7 +35,7 @@ Frontend (`cd frontend`):
 
 ## Gotchas
 
-- Backend's `typescript` is pinned to `^5.9.3`, not the latest major — `typescript-eslint` doesn't support TypeScript 7 yet (peer range `<6.1.0`). Don't bump backend TypeScript past that range without checking `typescript-eslint`'s peer support first.
+- Backend's `typescript` is pinned to `~6.0.2` (matching frontend), not the latest major — `typescript-eslint` doesn't support TypeScript 7 yet (peer range `<6.1.0`). Don't bump either project's TypeScript past that range without checking `typescript-eslint`'s peer support first.
 - Always run `npm install` from inside `/frontend` or `/backend`, never from the repo root — the repo root has no `package.json` of its own. 
 
 ## Working with libraries/frameworks
