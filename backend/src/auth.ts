@@ -8,7 +8,7 @@ export const auth = betterAuth({
   emailAndPassword: { enabled: true, disableSignUp: true },
   trustedOrigins: [env.FRONTEND_URL],
   rateLimit: {
-    enabled: true,
+    enabled: env.NODE_ENV === 'production',
     storage: 'database',
   },
   user: {
