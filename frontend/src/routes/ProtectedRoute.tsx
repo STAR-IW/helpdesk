@@ -14,7 +14,7 @@ export function ProtectedRoute({
 
   if (isPending) {
     return (
-      <div className="flex min-h-screen items-center justify-center text-slate-500">
+      <div className="flex min-h-screen items-center justify-center bg-background text-muted-foreground">
         Loading…
       </div>
     )

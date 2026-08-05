@@ -1,8 +1,14 @@
+import { Card, CardHeader, CardTitle } from '@/components/ui/card'
+
 export function UsersPage() {
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-background">
       <main className="p-6">
-        <h1 className="text-xl font-semibold text-slate-900">Users</h1>
+        <Card className="max-w-md">
+          <CardHeader>
+            <CardTitle>Users</CardTitle>
+          </CardHeader>
+        </Card>
       </main>
     </div>
   )

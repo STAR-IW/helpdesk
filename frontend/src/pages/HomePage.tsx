@@ -1,12 +1,17 @@
 import { Navbar } from '../components/Navbar'
+import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 
 export function HomePage() {
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-background">
       <Navbar />
       <main className="p-6">
-        <h1 className="text-xl font-semibold text-slate-900">Dashboard</h1>
-        <p className="mt-2 text-slate-600">You're logged in.</p>
+        <Card className="max-w-md">
+          <CardHeader>
+            <CardTitle>Dashboard</CardTitle>
+            <CardDescription>You're logged in.</CardDescription>
+          </CardHeader>
+        </Card>
       </main>
     </div>
   )
