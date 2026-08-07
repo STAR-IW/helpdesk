@@ -6,12 +6,16 @@
   "scripts": {
     "postinstall": "playwright install",
     "test": "playwright test",
+    "test:ui": "playwright test --ui",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.0",
     "@types/node": "^26.1.2",
+    "@types/pg": "^8.20.0",
+    "better-auth": "^1.6.25",
     "dotenv": "^17.4.2",
+    "pg": "^8.22.0",
     "typescript": "~6.0.2"
   }
 }
