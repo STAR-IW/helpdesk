@@ -91,6 +91,27 @@ test.describe('Route protection', () => {
     await expect(page.getByText('Users')).toBeVisible();
   });
 
+  test('users table lists the seeded admin and agent accounts with their role badges', async ({
+    page,
+  }) => {
+    await loginAsAdmin(page);
+
+    await page.goto('/users');
+
+    const table = page.getByRole('table');
+    await expect(table).toBeVisible();
+
+    const adminRow = table.getByRole('row', { name: ADMIN_EMAIL });
+    await expect(adminRow).toBeVisible();
+    await expect(adminRow.getByText('Admin', { exact: true })).toBeVisible();
+    await expect(adminRow.getByText('admin', { exact: true })).toBeVisible();
+
+    const agentRow = table.getByRole('row', { name: AGENT_EMAIL });
+    await expect(agentRow).toBeVisible();
+    await expect(agentRow.getByText('Agent', { exact: true })).toBeVisible();
+    await expect(agentRow.getByText('agent', { exact: true })).toBeVisible();
+  });
+
   test('authenticated agent visiting /users is redirected to /', async ({ page }) => {
     await loginAsAgent(page);
 

@@ -1,13 +1,85 @@
-import { Card, CardHeader, CardTitle } from '@/components/ui/card'
+import { useQuery } from '@tanstack/react-query'
+import { Navbar } from '@/components/Navbar'
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from '@/components/ui/table'
+import { apiGet, ApiError } from '@/lib/api'
+
+type User = {
+  id: string
+  name: string
+  email: string
+  role: 'admin' | 'agent'
+  createdAt: string
+}
 
 export function UsersPage() {
+  const {
+    data,
+    error,
+    isPending,
+  } = useQuery({
+    queryKey: ['users'],
+    queryFn: () => apiGet<{ users: User[] }>('/api/users'),
+  })
+  const users = data?.users ?? null
+  const errorMessage = error ? (error instanceof ApiError ? error.message : 'Failed to load users') : null
+
   return (
     <div className="min-h-screen bg-background">
+      <Navbar />
       <main className="p-6">
-        <Card className="max-w-md">
+        <Card>
           <CardHeader>
             <CardTitle>Users</CardTitle>
           </CardHeader>
+          <CardContent>
+            {errorMessage && (
+              <Alert variant="destructive">
+                <AlertDescription>{errorMessage}</AlertDescription>
+              </Alert>
+            )}
+            {!errorMessage && isPending && (
+              <p className="text-sm text-muted-foreground">Loading…</p>
+            )}
+            {!errorMessage && users !== null && users.length === 0 && (
+              <p className="text-sm text-muted-foreground">No users found.</p>
+            )}
+            {!errorMessage && users !== null && users.length > 0 && (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Joined</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {users.map((user) => (
+                    <TableRow key={user.id}>
+                      <TableCell>{user.name}</TableCell>
+                      <TableCell>{user.email}</TableCell>
+                      <TableCell>
+                        <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
+                          {user.role}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>{new Date(user.createdAt).toLocaleDateString()}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
         </Card>
       </main>
     </div>
