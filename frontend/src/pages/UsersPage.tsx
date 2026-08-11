@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Navbar } from '@/components/Navbar'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import { CreateUserDialog } from '@/components/CreateUserDialog'
+import { Card, CardHeader, CardTitle, CardAction, CardContent } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -41,6 +42,9 @@ export function UsersPage() {
         <Card>
           <CardHeader>
             <CardTitle>Users</CardTitle>
+            <CardAction>
+              <CreateUserDialog />
+            </CardAction>
           </CardHeader>
           <CardContent>
             {errorMessage && (

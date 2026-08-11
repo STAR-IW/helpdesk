@@ -35,7 +35,13 @@ export function LoginPage() {
   async function onSubmit(values: LoginFormValues) {
     setError(null)
 
-    const { error: signInError } = await authClient.signIn.email(values)
+    let signInError
+    try {
+      ;({ error: signInError } = await authClient.signIn.email(values))
+    } catch {
+      setError('Unable to reach the server. Please check your connection and try again.')
+      return
+    }
 
     if (signInError) {
       setError(signInError.message ?? 'Invalid email or password')
