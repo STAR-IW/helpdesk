@@ -114,4 +114,51 @@ describe('UsersPage', () => {
     })
     expect(await screen.findByRole('row', { name: /newagent@test\.com/ })).toBeInTheDocument()
   })
+
+  it('shows the create user dialog when the Create User button is clicked', async () => {
+    mockedApiGet.mockResolvedValue({ users })
+    const user = userEvent.setup()
+    renderWithProviders(<UsersPage />)
+
+    await screen.findByRole('table')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Create User' }))
+
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
+  it('hides the dialog when clicking outside of it', async () => {
+    mockedApiGet.mockResolvedValue({ users })
+    const user = userEvent.setup()
+    renderWithProviders(<UsersPage />)
+
+    await screen.findByRole('table')
+    await user.click(screen.getByRole('button', { name: 'Create User' }))
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    const overlay = document.querySelector('[data-slot="dialog-overlay"]')
+    expect(overlay).not.toBeNull()
+    await user.click(overlay as Element)
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+  })
+
+  it('hides the dialog when pressing Escape', async () => {
+    mockedApiGet.mockResolvedValue({ users })
+    const user = userEvent.setup()
+    renderWithProviders(<UsersPage />)
+
+    await screen.findByRole('table')
+    await user.click(screen.getByRole('button', { name: 'Create User' }))
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    await user.keyboard('{Escape}')
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+  })
 })

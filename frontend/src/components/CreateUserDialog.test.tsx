@@ -89,6 +89,24 @@ describe('CreateUserDialog', () => {
     expect(mockedApiPost).not.toHaveBeenCalled()
   })
 
+  it('shows a validation error and does not submit when the name contains numbers or symbols', async () => {
+    const user = await openDialog()
+
+    await fillAndSubmit(user, { name: 'Agent99!', email: 'agent@test.com', password: 'password123' })
+
+    expect(await screen.findByText('Name can only contain letters')).toBeInTheDocument()
+    expect(mockedApiPost).not.toHaveBeenCalled()
+  })
+
+  it('shows a validation error and does not submit when the name is only whitespace', async () => {
+    const user = await openDialog()
+
+    await fillAndSubmit(user, { name: '     ', email: 'agent@test.com', password: 'password123' })
+
+    expect(await screen.findByText('Name must be at least 3 characters')).toBeInTheDocument()
+    expect(mockedApiPost).not.toHaveBeenCalled()
+  })
+
   it('submits valid values to the create user endpoint', async () => {
     mockedApiPost.mockResolvedValue({
       user: { id: '3', name: 'Agent Smith', email: 'agent@test.com', role: 'agent', createdAt: '2026-08-10T00:00:00.000Z' },
