@@ -69,3 +69,62 @@ usersRouter.post('/', requireAuth, requireAdmin, async (req, res) => {
     res.status(500).json({ error: 'Failed to create user' });
   }
 });
+
+const updateUserSchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(3, 'Name must be at least 3 characters')
+    .regex(/^[A-Za-z\s]+$/, 'Name can only contain letters'),
+  email: z.email('Enter a valid email address'),
+  password: z.preprocess(
+    (val) => (val === '' || val === undefined ? undefined : val),
+    z.string().min(8, 'Password must be at least 8 characters').optional()
+  ),
+});
+
+usersRouter.patch<{ id: string }>('/:id', requireAuth, requireAdmin, async (req, res) => {
+  const parsed = updateUserSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0].message });
+    return;
+  }
+
+  const { name, email, password } = parsed.data;
+  const { id } = req.params;
+
+  try {
+    const user = await prisma.$transaction(async (tx) => {
+      const updated = await tx.user.update({
+        where: { id },
+        data: { name, email },
+        select: { id: true, name: true, email: true, role: true, createdAt: true },
+      });
+
+      if (password) {
+        const hashed = await hashPassword(password);
+        await tx.account.updateMany({
+          where: { userId: id, providerId: 'credential' },
+          data: { password: hashed },
+        });
+      }
+
+      return updated;
+    });
+
+    res.json({ user });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError) {
+      if (err.code === 'P2002') {
+        res.status(409).json({ error: 'A user with this email already exists' });
+        return;
+      }
+      if (err.code === 'P2025') {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+    }
+    console.error(err);
+    res.status(500).json({ error: 'Failed to update user' });
+  }
+});

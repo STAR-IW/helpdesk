@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { Navbar } from '@/components/Navbar'
 import { CreateUserDialog } from '@/components/CreateUserDialog'
+import { EditUserDialog } from '@/components/EditUserDialog'
 import { Card, CardHeader, CardTitle, CardAction, CardContent } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -60,6 +61,7 @@ export function UsersPage() {
                     <TableHead>Email</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>Joined</TableHead>
+                    <TableHead>Edit</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -77,6 +79,9 @@ export function UsersPage() {
                       <TableCell>
                         <Skeleton className="h-4 w-16" />
                       </TableCell>
+                      <TableCell>
+                        <Skeleton className="size-8" />
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -93,6 +98,7 @@ export function UsersPage() {
                     <TableHead>Email</TableHead>
                     <TableHead>Role</TableHead>
                     <TableHead>Joined</TableHead>
+                    <TableHead>Edit</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -106,6 +112,9 @@ export function UsersPage() {
                         </Badge>
                       </TableCell>
                       <TableCell>{new Date(user.createdAt).toLocaleDateString()}</TableCell>
+                      <TableCell>
+                        <EditUserDialog user={user} />
+                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

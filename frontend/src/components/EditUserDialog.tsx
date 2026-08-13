@@ -3,6 +3,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { PencilIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -16,21 +17,23 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { apiPost, ApiError } from '@/lib/api'
+import { apiPatch, ApiError } from '@/lib/api'
 
-const createUserSchema = z.object({
+const editUserSchema = z.object({
   name: z
     .string()
     .trim()
     .min(3, 'Name must be at least 3 characters')
     .regex(/^[A-Za-z\s]+$/, 'Name can only contain letters'),
   email: z.email('Enter a valid email address'),
-  password: z.string().min(8, 'Password must be at least 8 characters'),
+  password: z
+    .string()
+    .refine((val) => val === '' || val.length >= 8, 'Password must be at least 8 characters'),
 })
 
-type CreateUserFormValues = z.infer<typeof createUserSchema>
+type EditUserFormValues = z.infer<typeof editUserSchema>
 
-type CreatedUser = {
+type EditableUser = {
   id: string
   name: string
   email: string
@@ -38,7 +41,7 @@ type CreatedUser = {
   createdAt: string
 }
 
-export function CreateUserDialog() {
+export function EditUserDialog({ user }: { user: EditableUser }) {
   const [open, setOpen] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
   const queryClient = useQueryClient()
@@ -47,47 +50,59 @@ export function CreateUserDialog() {
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm<CreateUserFormValues>({ resolver: zodResolver(createUserSchema) })
+  } = useForm<EditUserFormValues>({
+    resolver: zodResolver(editUserSchema),
+    defaultValues: { name: user.name, email: user.email, password: '' },
+  })
 
   const mutation = useMutation({
-    mutationFn: (values: CreateUserFormValues) =>
-      apiPost<{ user: CreatedUser }>('/api/users', values),
+    mutationFn: (values: EditUserFormValues) =>
+      apiPatch<{ user: EditableUser }>(`/api/users/${user.id}`, {
+        name: values.name,
+        email: values.email,
+        password: values.password === '' ? undefined : values.password,
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] })
       handleOpenChange(false)
     },
     onError: (err) => {
-      setServerError(err instanceof ApiError ? err.message : 'Failed to create user')
+      setServerError(err instanceof ApiError ? err.message : 'Failed to update user')
     },
   })
 
   function handleOpenChange(nextOpen: boolean) {
     setOpen(nextOpen)
-    if (!nextOpen) {
-      reset()
+    if (nextOpen) {
+      reset({ name: user.name, email: user.email, password: '' })
+    } else {
       setServerError(null)
       mutation.reset()
     }
   }
 
-  function onSubmit(values: CreateUserFormValues) {
+  function onSubmit(values: EditUserFormValues) {
     setServerError(null)
     mutation.mutate(values)
   }
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger render={<Button>Create User</Button>} />
+      <DialogTrigger
+        render={<Button variant="ghost" size="icon" aria-label={`Edit ${user.name}`} />}
+      >
+        <PencilIcon />
+      </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Create User</DialogTitle>
-          <DialogDescription>New users are created with the agent role.</DialogDescription>
+          <DialogTitle>Edit User</DialogTitle>
+          <DialogDescription>Leave the password blank to keep it unchanged.</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4" noValidate>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="create-user-name">Name</Label>
+            <Label htmlFor="edit-user-name">Name</Label>
             <Input
-              id="create-user-name"
+              id="edit-user-name"
               autoComplete="name"
               aria-invalid={!!errors.name}
               {...register('name')}
@@ -99,9 +114,9 @@ export function CreateUserDialog() {
             )}
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="create-user-email">Email</Label>
+            <Label htmlFor="edit-user-email">Email</Label>
             <Input
-              id="create-user-email"
+              id="edit-user-email"
               type="email"
               autoComplete="email"
               aria-invalid={!!errors.email}
@@ -114,9 +129,9 @@ export function CreateUserDialog() {
             )}
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="create-user-password">Password</Label>
+            <Label htmlFor="edit-user-password">Password</Label>
             <Input
-              id="create-user-password"
+              id="edit-user-password"
               type="password"
               autoComplete="new-password"
               aria-invalid={!!errors.password}
@@ -135,7 +150,7 @@ export function CreateUserDialog() {
           )}
           <DialogFooter>
             <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? 'Creating…' : 'Create User'}
+              {mutation.isPending ? 'Saving…' : 'Save Changes'}
             </Button>
           </DialogFooter>
         </form>

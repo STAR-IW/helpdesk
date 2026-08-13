@@ -3,7 +3,7 @@ import { screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/render'
 import { UsersPage } from './UsersPage'
-import { apiGet, apiPost, ApiError } from '@/lib/api'
+import { apiGet, apiPost, apiPatch, ApiError } from '@/lib/api'
 
 vi.mock('@/components/Navbar', () => ({
   Navbar: () => null,
@@ -15,11 +15,13 @@ vi.mock('@/lib/api', async () => {
     ...actual,
     apiGet: vi.fn(),
     apiPost: vi.fn(),
+    apiPatch: vi.fn(),
   }
 })
 
 const mockedApiGet = vi.mocked(apiGet)
 const mockedApiPost = vi.mocked(apiPost)
+const mockedApiPatch = vi.mocked(apiPatch)
 
 const users = [
   { id: '1', name: 'Admin', email: 'admin@test.com', role: 'admin' as const, createdAt: '2026-01-15T00:00:00.000Z' },
@@ -29,6 +31,7 @@ const users = [
 beforeEach(() => {
   mockedApiGet.mockReset()
   mockedApiPost.mockReset()
+  mockedApiPatch.mockReset()
 })
 
 describe('UsersPage', () => {
@@ -160,5 +163,39 @@ describe('UsersPage', () => {
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     })
+  })
+
+  it('renders an edit button for each user row', async () => {
+    mockedApiGet.mockResolvedValue({ users })
+
+    renderWithProviders(<UsersPage />)
+
+    await screen.findByRole('row', { name: /admin@test\.com/ })
+    expect(screen.getByRole('button', { name: 'Edit Admin' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Edit Agent Smith' })).toBeInTheDocument()
+  })
+
+  it('refreshes the list after editing a user', async () => {
+    const updatedUsers = [users[0], { ...users[1], name: 'Agent Jones' }]
+    mockedApiGet.mockResolvedValueOnce({ users })
+    mockedApiGet.mockResolvedValueOnce({ users: updatedUsers })
+    mockedApiPatch.mockResolvedValue({ user: updatedUsers[1] })
+
+    const user = userEvent.setup()
+    renderWithProviders(<UsersPage />)
+
+    await screen.findByRole('row', { name: /agent@test\.com/ })
+    await user.click(screen.getByRole('button', { name: 'Edit Agent Smith' }))
+
+    const dialog = screen.getByRole('dialog')
+    const nameInput = within(dialog).getByLabelText('Name')
+    await user.clear(nameInput)
+    await user.type(nameInput, 'Agent Jones')
+    await user.click(within(dialog).getByRole('button', { name: 'Save Changes' }))
+
+    await waitFor(() => {
+      expect(mockedApiGet).toHaveBeenCalledTimes(2)
+    })
+    expect(await screen.findByRole('row', { name: /Agent Jones/ })).toBeInTheDocument()
   })
 })
