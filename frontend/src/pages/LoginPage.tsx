@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useNavigate } from 'react-router'
-import { authClient } from '../lib/auth-client'
+import { authClient, useSession } from '../lib/auth-client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -25,12 +25,21 @@ type LoginFormValues = z.infer<typeof loginSchema>
 
 export function LoginPage() {
   const navigate = useNavigate()
+  const { data: session } = useSession()
   const [error, setError] = useState<string | null>(null)
+  const [isRedirecting, setIsRedirecting] = useState(false)
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
   } = useForm<LoginFormValues>({ resolver: zodResolver(loginSchema) })
+
+
+  useEffect(() => {
+    if (session) {
+      navigate('/', { replace: true })
+    }
+  }, [session, navigate])
 
   async function onSubmit(values: LoginFormValues) {
     setError(null)
@@ -48,7 +57,7 @@ export function LoginPage() {
       return
     }
 
-    navigate('/', { replace: true })
+    setIsRedirecting(true)
   }
 
   return (
@@ -95,8 +104,8 @@ export function LoginPage() {
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
             )}
-            <Button type="submit" disabled={isSubmitting} className="w-full">
-              {isSubmitting ? 'Signing in…' : 'Sign in'}
+            <Button type="submit" disabled={isSubmitting || isRedirecting} className="w-full">
+              {isSubmitting || isRedirecting ? 'Signing in…' : 'Sign in'}
             </Button>
           </form>
         </CardContent>
