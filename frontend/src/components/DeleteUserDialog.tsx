@@ -13,12 +13,12 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { apiDelete, ApiError } from '@/lib/api'
+import { apiDelete, ApiError, type Role } from '@/lib/api'
 
 type DeletableUser = {
   id: string
   name: string
-  role: 'admin' | 'agent'
+  role: Role
 }
 
 export function DeleteUserDialog({ user }: { user: DeletableUser }) {

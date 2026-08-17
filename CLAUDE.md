@@ -49,6 +49,7 @@ Vitest + React Testing Library, `jsdom` environment (configured in `frontend/vit
 - To add more shadcn components: `cd frontend && npx shadcn@latest add <component>`.
 - better-auth's rate limiter is enabled only when `NODE_ENV=production` (`backend/src/auth.ts`, gated via `backend/src/env.ts`'s `NODE_ENV`) — an explicit, deliberate gate, not a library default being relied on. Sign-in is unthrottled in development and test; remember to set `NODE_ENV=production` on deploy.
 - Use zod for data validation, on both sides: backend routes validate `req.body` with a `zod` schema and `safeParse` (see `backend/src/routes/users.ts`'s `createUserSchema`), and frontend forms validate with a `zod` schema via `@hookform/resolvers/zod`'s `zodResolver` (see `frontend/src/pages/LoginPage.tsx`). `zod` is already a dependency in both `/backend` and `/frontend` — don't reach for another validation library.
+- User `role` is `admin` | `agent` (defined in `backend/prisma/schema.prisma`'s `Role` enum). Never compare or assign it with raw string literals — backend code imports and uses the generated `Role` enum from `backend/src/generated/prisma/enums.js` (e.g. `Role.admin`, `Role.agent`); frontend code can't import that generated file (separate npm project), so it uses the `Role` type alias exported from `frontend/src/lib/api.ts` instead. Any new file that reads or checks a user's role should import one of these rather than writing `'admin'`/`'agent'` inline.
 
 ## Gotchas
 

@@ -17,7 +17,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { apiPatch, ApiError } from '@/lib/api'
+import { apiPatch, ApiError, type Role } from '@/lib/api'
 
 const editUserSchema = z.object({
   name: z
@@ -37,7 +37,7 @@ type EditableUser = {
   id: string
   name: string
   email: string
-  role: 'admin' | 'agent'
+  role: Role
   createdAt: string
 }
 

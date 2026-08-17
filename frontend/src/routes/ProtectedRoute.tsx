@@ -1,13 +1,14 @@
 import type { ReactNode } from 'react'
 import { Navigate } from 'react-router'
 import { useSession } from '../lib/auth-client'
+import type { Role } from '@/lib/api'
 
 export function ProtectedRoute({
   children,
   role,
 }: {
   children: ReactNode
-  role?: string
+  role?: Role
 }) {
   const { data:
       session, isPending } = useSession()

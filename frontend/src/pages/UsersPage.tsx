@@ -15,13 +15,13 @@ import {
   TableHead,
   TableCell,
 } from '@/components/ui/table'
-import { apiGet, ApiError } from '@/lib/api'
+import { apiGet, ApiError, type Role } from '@/lib/api'
 
 type User = {
   id: string
   name: string
   email: string
-  role: 'admin' | 'agent'
+  role: Role
   createdAt: string
 }
 

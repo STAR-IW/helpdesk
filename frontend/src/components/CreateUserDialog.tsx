@@ -16,7 +16,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { apiPost, ApiError } from '@/lib/api'
+import { apiPost, ApiError, type Role } from '@/lib/api'
 
 const createUserSchema = z.object({
   name: z
@@ -34,7 +34,7 @@ type CreatedUser = {
   id: string
   name: string
   email: string
-  role: 'admin' | 'agent'
+  role: Role
   createdAt: string
 }
 
