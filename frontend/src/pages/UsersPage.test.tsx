@@ -3,7 +3,7 @@ import { screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/render'
 import { UsersPage } from './UsersPage'
-import { apiGet, apiPost, apiPatch, ApiError } from '@/lib/api'
+import { apiGet, apiPost, apiPatch, apiDelete, ApiError } from '@/lib/api'
 
 vi.mock('@/components/Navbar', () => ({
   Navbar: () => null,
@@ -16,12 +16,14 @@ vi.mock('@/lib/api', async () => {
     apiGet: vi.fn(),
     apiPost: vi.fn(),
     apiPatch: vi.fn(),
+    apiDelete: vi.fn(),
   }
 })
 
 const mockedApiGet = vi.mocked(apiGet)
 const mockedApiPost = vi.mocked(apiPost)
 const mockedApiPatch = vi.mocked(apiPatch)
+const mockedApiDelete = vi.mocked(apiDelete)
 
 const users = [
   { id: '1', name: 'Admin', email: 'admin@test.com', role: 'admin' as const, createdAt: '2026-01-15T00:00:00.000Z' },
@@ -32,6 +34,7 @@ beforeEach(() => {
   mockedApiGet.mockReset()
   mockedApiPost.mockReset()
   mockedApiPatch.mockReset()
+  mockedApiDelete.mockReset()
 })
 
 describe('UsersPage', () => {
@@ -197,5 +200,37 @@ describe('UsersPage', () => {
       expect(mockedApiGet).toHaveBeenCalledTimes(2)
     })
     expect(await screen.findByRole('row', { name: /Agent Jones/ })).toBeInTheDocument()
+  })
+
+  it('renders a delete button for each user row, disabled for the admin', async () => {
+    mockedApiGet.mockResolvedValue({ users })
+
+    renderWithProviders(<UsersPage />)
+
+    await screen.findByRole('row', { name: /admin@test\.com/ })
+    expect(screen.getByRole('button', { name: 'Delete Admin' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Delete Agent Smith' })).toBeEnabled()
+  })
+
+  it('removes a user from the list after deleting them', async () => {
+    mockedApiGet.mockResolvedValueOnce({ users })
+    mockedApiGet.mockResolvedValueOnce({ users: [users[0]] })
+    mockedApiDelete.mockResolvedValue(undefined)
+
+    const user = userEvent.setup()
+    renderWithProviders(<UsersPage />)
+
+    await screen.findByRole('row', { name: /agent@test\.com/ })
+    await user.click(screen.getByRole('button', { name: 'Delete Agent Smith' }))
+
+    const dialog = screen.getByRole('dialog')
+    await user.click(within(dialog).getByRole('button', { name: 'Delete' }))
+
+    await waitFor(() => {
+      expect(mockedApiGet).toHaveBeenCalledTimes(2)
+    })
+    await waitFor(() => {
+      expect(screen.queryByRole('row', { name: /agent@test\.com/ })).not.toBeInTheDocument()
+    })
   })
 })

@@ -45,3 +45,14 @@ export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
   }
   return res.json() as Promise<T>
 }
+
+export async function apiDelete(path: string): Promise<void> {
+  const res = await fetch(`${API_URL}${path}`, {
+    method: 'DELETE',
+    credentials: 'include',
+  })
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({}))
+    throw new ApiError(res.status, errBody.error ?? `Request failed: ${res.status}`)
+  }
+}

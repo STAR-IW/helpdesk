@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Navbar } from '@/components/Navbar'
 import { CreateUserDialog } from '@/components/CreateUserDialog'
 import { EditUserDialog } from '@/components/EditUserDialog'
+import { DeleteUserDialog } from '@/components/DeleteUserDialog'
 import { Card, CardHeader, CardTitle, CardAction, CardContent } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -62,6 +63,7 @@ export function UsersPage() {
                     <TableHead>Role</TableHead>
                     <TableHead>Joined</TableHead>
                     <TableHead>Edit</TableHead>
+                    <TableHead>Delete</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -78,6 +80,9 @@ export function UsersPage() {
                       </TableCell>
                       <TableCell>
                         <Skeleton className="h-4 w-16" />
+                      </TableCell>
+                      <TableCell>
+                        <Skeleton className="size-8" />
                       </TableCell>
                       <TableCell>
                         <Skeleton className="size-8" />
@@ -99,6 +104,7 @@ export function UsersPage() {
                     <TableHead>Role</TableHead>
                     <TableHead>Joined</TableHead>
                     <TableHead>Edit</TableHead>
+                    <TableHead>Delete</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -114,6 +120,9 @@ export function UsersPage() {
                       <TableCell>{new Date(user.createdAt).toLocaleDateString()}</TableCell>
                       <TableCell>
                         <EditUserDialog user={user} />
+                      </TableCell>
+                      <TableCell>
+                        <DeleteUserDialog user={user} />
                       </TableCell>
                     </TableRow>
                   ))}
