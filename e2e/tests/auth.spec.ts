@@ -39,7 +39,8 @@ test.describe('Login page', () => {
     await page.goto('/login');
     await page.getByRole('button', { name: 'Sign in' }).click();
 
-    await expect(page.getByText('Email is required')).toBeVisible();
+    const emailInput = page.getByLabel('Email');
+    await expect(emailInput).toHaveAttribute('aria-invalid', 'true');
     await expect(page.getByText('Password is required')).toBeVisible();
     await expect(page).toHaveURL('/login');
   });
@@ -56,16 +57,13 @@ test.describe('Login page', () => {
     await expect(page).toHaveURL('/login');
   });
 
-  test('visiting /login while already authenticated renders the login page (no redirect)', async ({
-    page,
-  }) => {
-
+  test('visiting /login while already authenticated redirects to /', async ({ page }) => {
     await loginAsAdmin(page);
 
     await page.goto('/login');
 
-    await expect(page).toHaveURL('/login');
-    await expect(page.getByText('Helpdesk Login')).toBeVisible();
+    await expect(page).toHaveURL('/');
+    await expect(page.getByText("You're logged in.")).toBeVisible();
   });
 });
 
@@ -88,7 +86,7 @@ test.describe('Route protection', () => {
     await page.goto('/users');
 
     await expect(page).toHaveURL('/users');
-    await expect(page.getByText('Users')).toBeVisible();
+    await expect(page.getByRole('main').getByText('Users')).toBeVisible();
   });
 
   test('users table lists the seeded admin and agent accounts with their role badges', async ({
