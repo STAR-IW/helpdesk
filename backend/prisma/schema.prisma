@@ -91,3 +91,50 @@ model RateLimit {
   @@unique([key])
   @@map("rateLimit")
 }
+
+enum TicketStatus {
+  open
+  resolved
+  closed
+}
+
+enum TicketCategory {
+  generalQuestion
+  technicalQuestion
+  refundRequest
+}
+
+model Ticket {
+  id             String          @id @default(cuid())
+  subject        String
+  status         TicketStatus    @default(open)
+  category       TicketCategory?
+  requesterEmail String
+  requesterName  String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  messages       Message[]
+
+  @@index([requesterEmail])
+  @@index([status])
+  @@index([category])
+  @@index([createdAt])
+  @@map("ticket")
+}
+
+model Message {
+  id         String   @id @default(cuid())
+  ticketId   String
+  ticket     Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  fromEmail  String
+  fromName   String?
+  toEmail    String
+  body       String
+  messageId  String?  @unique
+  inReplyTo  String?
+  references String?
+  createdAt  DateTime @default(now())
+
+  @@index([ticketId])
+  @@map("message")
+}
