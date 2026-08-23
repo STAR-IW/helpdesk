@@ -35,6 +35,7 @@ export default defineConfig({
         BETTER_AUTH_SECRET: process.env.BETTER_AUTH_SECRET!,
         BETTER_AUTH_URL: process.env.BETTER_AUTH_URL!,
         FRONTEND_URL: process.env.FRONTEND_URL!,
+        INBOUND_EMAIL_WEBHOOK_SECRET: process.env.INBOUND_EMAIL_WEBHOOK_SECRET!,
       },
       reuseExistingServer: !process.env.CI,
       timeout: 30_000,
