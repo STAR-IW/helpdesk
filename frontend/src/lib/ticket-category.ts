@@ -1,0 +1,1 @@
+export type TicketCategory = 'generalQuestion' | 'technicalQuestion' | 'refundRequest'

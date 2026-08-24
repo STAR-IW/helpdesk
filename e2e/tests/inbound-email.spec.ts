@@ -1,9 +1,6 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
 import { closeTicket, deleteTicket, findTicketsByRequesterEmail } from './helpers/tickets-db.js';
 
-const API_ORIGIN = 'http://localhost:3000';
-const WEBHOOK_URL = `${API_ORIGIN}/api/webhooks/inbound-email`;
-
 function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value) {
@@ -12,6 +9,8 @@ function requireEnv(name: string): string {
   return value;
 }
 
+const API_ORIGIN = requireEnv('BETTER_AUTH_URL');
+const WEBHOOK_URL = `${API_ORIGIN}/api/webhooks/inbound-email`;
 const WEBHOOK_SECRET = requireEnv('INBOUND_EMAIL_WEBHOOK_SECRET');
 
 function randomLetters(length: number): string {

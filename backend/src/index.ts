@@ -5,6 +5,7 @@ import { toNodeHandler } from 'better-auth/node';
 import { auth } from './auth.js';
 import { usersRouter } from './routes/users.js';
 import { inboundEmailRouter } from './routes/inbound-email.js';
+import { ticketsRouter } from './routes/tickets.js';
 
 const app = express();
 const port = env.PORT ?? 3000;
@@ -20,6 +21,7 @@ app.get('/api/health', (_req, res) => {
 });
 
 app.use('/api/users', usersRouter);
+app.use('/api/tickets', ticketsRouter);
 app.use('/api/webhooks/inbound-email', inboundEmailRouter);
 
 app.listen(port, () => {

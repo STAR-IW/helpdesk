@@ -24,6 +24,9 @@ export function Navbar() {
         Helpdesk
       </button>
       <div className="flex items-center gap-4">
+        <Button variant="ghost" size="sm" onClick={() => navigate('/tickets')}>
+          Tickets
+        </Button>
         {session?.user.role === 'admin' && (
           <Button variant="ghost" size="sm" onClick={() => navigate('/users')}>
             Users

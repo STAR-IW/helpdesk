@@ -55,6 +55,11 @@ Vitest + React Testing Library, `jsdom` environment (configured in `frontend/vit
 
 - Backend's `typescript` is pinned to `~6.0.2` (matching frontend), not the latest major — `typescript-eslint` doesn't support TypeScript 7 yet (peer range `<6.1.0`). Don't bump either project's TypeScript past that range without checking `typescript-eslint`'s peer support first.
 - Always run `npm install` from inside `/frontend`, `/backend`, or `/e2e`, never from the repo root — the repo root has no `package.json` of its own.
+- `/e2e` runs its backend/frontend on dedicated ports — `3001`/`5174` (`e2e/.env`'s `PORT`/`FRONTEND_URL`/`VITE_API_URL`, wired through `e2e/playwright.config.ts`) — deliberately different from the dev defaults (`3000`/`5173`). Never manually start a dev server (`npm run dev` in `/backend` or `/frontend`) on `3001`/`5174`, and never point `e2e/.env`'s `DATABASE_URL` at the dev database. If a dev server happens to already be running on the *dev* ports when e2e tests run, that's fine — they no longer collide. This separation exists because Playwright's `reuseExistingServer: true` will silently reuse whatever's already listening on a port instead of starting its own — previously this meant a leftover dev backend (wired to the dev DB) got reused by e2e runs, so tests silently authenticated against real dev data instead of the freshly-seeded `helpdesk_test` database.
+
+## e2e tests
+
+- Never manually run `npx prisma migrate reset` (or anything destructive) against a database without confirming the target and getting explicit user consent first — `e2e/global-setup.ts`/`global-teardown.ts` already do this against `helpdesk_test` on every e2e run, which is expected, but always verify `DATABASE_URL` at the time before assuming any reset is safe.
 
 ## Working with libraries/frameworks
 

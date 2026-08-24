@@ -1,8 +1,15 @@
 import { test, expect } from '@playwright/test';
 import { loginAsAdmin } from './helpers/auth.js';
 
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`${name} must be set in e2e/.env — see e2e/.env.example`);
+  }
+  return value;
+}
 
-const API_ORIGIN = 'http://localhost:3000';
+const API_ORIGIN = requireEnv('BETTER_AUTH_URL');
 
 function randomLetters(length: number): string {
   const alphabet = 'abcdefghijklmnopqrstuvwxyz';

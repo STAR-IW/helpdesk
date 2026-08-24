@@ -15,6 +15,8 @@ test.describe('Login page', () => {
 
     await expect(page).toHaveURL('/');
     await expect(page.getByText("You're logged in.")).toBeVisible();
+
+
   });
 
   test('wrong password for an existing email shows an inline error and stays on /login', async ({
