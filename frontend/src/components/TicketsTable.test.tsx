@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/render'
 import { TicketsTable } from './TicketsTable'
 import { apiGet, ApiError } from '@/lib/api'
@@ -91,5 +92,44 @@ describe('TicketsTable', () => {
     renderWithProviders(<TicketsTable />)
 
     expect(await screen.findByText('Failed to load tickets')).toBeInTheDocument()
+  })
+
+  it('sorts by createdAt descending by default', async () => {
+    mockedApiGet.mockResolvedValue({ tickets })
+
+    renderWithProviders(<TicketsTable />)
+
+    await screen.findByRole('row', { name: /Refund please/ })
+    const lastCallUrl = mockedApiGet.mock.calls.at(-1)?.[0]
+    expect(lastCallUrl).toContain('sortBy=createdAt')
+    expect(lastCallUrl).toContain('sortOrder=desc')
+  })
+
+  it('toggles sort direction when clicking the active column header again', async () => {
+    const user = userEvent.setup()
+    mockedApiGet.mockResolvedValue({ tickets })
+
+    renderWithProviders(<TicketsTable />)
+
+    await screen.findByRole('row', { name: /Refund please/ })
+    await user.click(screen.getByRole('button', { name: /Created/ }))
+
+    const lastCallUrl = mockedApiGet.mock.calls.at(-1)?.[0]
+    expect(lastCallUrl).toContain('sortBy=createdAt')
+    expect(lastCallUrl).toContain('sortOrder=asc')
+  })
+
+  it('sorts ascending when switching to a different column', async () => {
+    const user = userEvent.setup()
+    mockedApiGet.mockResolvedValue({ tickets })
+
+    renderWithProviders(<TicketsTable />)
+
+    await screen.findByRole('row', { name: /Refund please/ })
+    await user.click(screen.getByRole('button', { name: /Subject/ }))
+
+    const lastCallUrl = mockedApiGet.mock.calls.at(-1)?.[0]
+    expect(lastCallUrl).toContain('sortBy=subject')
+    expect(lastCallUrl).toContain('sortOrder=asc')
   })
 })

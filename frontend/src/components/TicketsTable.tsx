@@ -1,4 +1,13 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import {
+  useReactTable,
+  getCoreRowModel,
+  flexRender,
+  type ColumnDef,
+  type SortingState,
+} from '@tanstack/react-table'
+import { ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -43,17 +52,92 @@ const CATEGORY_LABELS: Record<TicketCategory, string> = {
   refundRequest: 'Refund request',
 }
 
+const columns: ColumnDef<Ticket>[] = [
+  { id: 'subject', accessorKey: 'subject', header: 'Subject' },
+  {
+    id: 'requesterName',
+    header: 'Requester',
+    accessorFn: (row) => row.requesterName ?? row.requesterEmail,
+  },
+  {
+    id: 'status',
+    accessorKey: 'status',
+    header: 'Status',
+    cell: ({ row }) => (
+      <Badge variant={STATUS_VARIANTS[row.original.status]}>
+        {STATUS_LABELS[row.original.status]}
+      </Badge>
+    ),
+  },
+  {
+    id: 'category',
+    accessorKey: 'category',
+    header: 'Category',
+    cell: ({ row }) =>
+      row.original.category ? (
+        <Badge variant="outline">{CATEGORY_LABELS[row.original.category]}</Badge>
+      ) : (
+        <span className="text-sm text-muted-foreground">Uncategorized</span>
+      ),
+  },
+  {
+    id: 'createdAt',
+    accessorKey: 'createdAt',
+    header: 'Created',
+    cell: ({ row }) => new Date(row.original.createdAt).toLocaleDateString(),
+  },
+]
+
 export function TicketsTable() {
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'createdAt', desc: true }])
+  const sortBy = sorting[0]?.id ?? 'createdAt'
+  const sortOrder = sorting[0]?.desc ? 'desc' : 'asc'
+
   const {
     data,
     error,
     isPending,
   } = useQuery({
-    queryKey: ['tickets'],
-    queryFn: () => apiGet<{ tickets: Ticket[] }>('/api/tickets'),
+    queryKey: ['tickets', sortBy, sortOrder],
+    queryFn: () => {
+      const params = new URLSearchParams({ sortBy, sortOrder })
+      return apiGet<{ tickets: Ticket[] }>(`/api/tickets?${params.toString()}`)
+    },
   })
   const tickets = data?.tickets ?? null
   const errorMessage = error ? (error instanceof ApiError ? error.message : 'Failed to load tickets') : null
+
+  const table = useReactTable({
+    data: tickets ?? [],
+    columns,
+    state: { sorting },
+    onSortingChange: setSorting,
+    manualSorting: true,
+    enableSortingRemoval: false,
+    getCoreRowModel: getCoreRowModel(),
+  })
+
+  const headerRow = table.getHeaderGroups()[0]
+  const headerCells = headerRow.headers.map((header) => {
+    const sorted = header.column.getIsSorted()
+    return (
+      <TableHead
+        key={header.id}
+        aria-sort={sorted === 'asc' ? 'ascending' : sorted === 'desc' ? 'descending' : 'none'}
+      >
+        <button
+          type="button"
+          className="flex items-center gap-1"
+          onClick={header.column.getToggleSortingHandler()}
+        >
+          {flexRender(header.column.columnDef.header, header.getContext())}
+          {sorted === 'asc' && <ArrowUp className="size-3.5" />}
+          {sorted === 'desc' && <ArrowDown className="size-3.5" />}
+          {!sorted && <ArrowUpDown className="size-3.5 text-muted-foreground" />}
+        </button>
+      </TableHead>
+    )
+  })
 
   return (
     <>
@@ -65,13 +149,7 @@ export function TicketsTable() {
       {!errorMessage && isPending && (
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead>Subject</TableHead>
-              <TableHead>Requester</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead>Created</TableHead>
-            </TableRow>
+            <TableRow>{headerCells}</TableRow>
           </TableHeader>
           <TableBody>
             {Array.from({ length: 5 }).map((_, i) => (
@@ -102,32 +180,16 @@ export function TicketsTable() {
       {!errorMessage && tickets !== null && tickets.length > 0 && (
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead>Subject</TableHead>
-              <TableHead>Requester</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Category</TableHead>
-              <TableHead>Created</TableHead>
-            </TableRow>
+            <TableRow>{headerCells}</TableRow>
           </TableHeader>
           <TableBody>
-            {tickets.map((ticket) => (
-              <TableRow key={ticket.id}>
-                <TableCell>{ticket.subject}</TableCell>
-                <TableCell>{ticket.requesterName ?? ticket.requesterEmail}</TableCell>
-                <TableCell>
-                  <Badge variant={STATUS_VARIANTS[ticket.status]}>
-                    {STATUS_LABELS[ticket.status]}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  {ticket.category ? (
-                    <Badge variant="outline">{CATEGORY_LABELS[ticket.category]}</Badge>
-                  ) : (
-                    <span className="text-sm text-muted-foreground">Uncategorized</span>
-                  )}
-                </TableCell>
-                <TableCell>{new Date(ticket.createdAt).toLocaleDateString()}</TableCell>
+            {table.getRowModel().rows.map((row) => (
+              <TableRow key={row.id}>
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell key={cell.id}>
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
+                ))}
               </TableRow>
             ))}
           </TableBody>
