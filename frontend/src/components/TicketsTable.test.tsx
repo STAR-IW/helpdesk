@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { screen, within } from '@testing-library/react'
+import { screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { renderWithProviders } from '@/test/render'
 import { TicketsTable } from './TicketsTable'
@@ -131,5 +131,92 @@ describe('TicketsTable', () => {
     const lastCallUrl = mockedApiGet.mock.calls.at(-1)?.[0]
     expect(lastCallUrl).toContain('sortBy=subject')
     expect(lastCallUrl).toContain('sortOrder=asc')
+  })
+
+  it('does not send a status or category param by default', async () => {
+    mockedApiGet.mockResolvedValue({ tickets })
+
+    renderWithProviders(<TicketsTable />)
+
+    await screen.findByRole('row', { name: /Refund please/ })
+    const lastCallUrl = mockedApiGet.mock.calls.at(-1)?.[0]
+    expect(lastCallUrl).not.toContain('status=')
+    expect(lastCallUrl).not.toContain('category=')
+    expect(lastCallUrl).not.toContain('search=')
+  })
+
+  it('searches by text after debounce', async () => {
+    const user = userEvent.setup()
+    mockedApiGet.mockResolvedValue({ tickets })
+
+    renderWithProviders(<TicketsTable />)
+
+    await screen.findByRole('row', { name: /Refund please/ })
+    await user.type(screen.getByRole('textbox', { name: /search tickets/i }), 'refund')
+
+    await waitFor(() => {
+      const lastCallUrl = mockedApiGet.mock.calls.at(-1)?.[0]
+      expect(lastCallUrl).toContain('search=refund')
+    })
+  })
+
+  it('hides the clear filters button when no filters are active', async () => {
+    mockedApiGet.mockResolvedValue({ tickets })
+
+    renderWithProviders(<TicketsTable />)
+
+    await screen.findByRole('row', { name: /Refund please/ })
+    expect(screen.queryByRole('button', { name: /clear filters/i })).not.toBeInTheDocument()
+  })
+
+  it('clears all filters when the clear filters button is clicked', async () => {
+    const user = userEvent.setup()
+    mockedApiGet.mockResolvedValue({ tickets })
+
+    renderWithProviders(<TicketsTable />)
+
+    await screen.findByRole('row', { name: /Refund please/ })
+    await user.click(screen.getByRole('combobox', { name: /filter by status/i }))
+    await user.click(await screen.findByRole('option', { name: 'Open' }))
+    await user.type(screen.getByRole('textbox', { name: /search tickets/i }), 'refund')
+
+    const clearButton = await screen.findByRole('button', { name: /clear filters/i })
+    await user.click(clearButton)
+
+    expect(screen.getByRole('textbox', { name: /search tickets/i })).toHaveValue('')
+    expect(screen.queryByRole('button', { name: /clear filters/i })).not.toBeInTheDocument()
+    await waitFor(() => {
+      const lastCallUrl = mockedApiGet.mock.calls.at(-1)?.[0]
+      expect(lastCallUrl).not.toContain('status=')
+      expect(lastCallUrl).not.toContain('search=')
+    })
+  })
+
+  it('filters by status when a status is selected', async () => {
+    const user = userEvent.setup()
+    mockedApiGet.mockResolvedValue({ tickets })
+
+    renderWithProviders(<TicketsTable />)
+
+    await screen.findByRole('row', { name: /Refund please/ })
+    await user.click(screen.getByRole('combobox', { name: /filter by status/i }))
+    await user.click(await screen.findByRole('option', { name: 'Open' }))
+
+    const lastCallUrl = mockedApiGet.mock.calls.at(-1)?.[0]
+    expect(lastCallUrl).toContain('status=open')
+  })
+
+  it('filters by category when a category is selected', async () => {
+    const user = userEvent.setup()
+    mockedApiGet.mockResolvedValue({ tickets })
+
+    renderWithProviders(<TicketsTable />)
+
+    await screen.findByRole('row', { name: /Refund please/ })
+    await user.click(screen.getByRole('combobox', { name: /filter by category/i }))
+    await user.click(await screen.findByRole('option', { name: 'Technical question' }))
+
+    const lastCallUrl = mockedApiGet.mock.calls.at(-1)?.[0]
+    expect(lastCallUrl).toContain('category=technicalQuestion')
   })
 })

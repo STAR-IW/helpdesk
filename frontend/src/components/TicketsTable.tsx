@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   useReactTable,
@@ -7,10 +7,19 @@ import {
   type ColumnDef,
   type SortingState,
 } from '@tanstack/react-table'
-import { ArrowUp, ArrowDown, ArrowUpDown } from 'lucide-react'
+import { ArrowUp, ArrowDown, ArrowUpDown, Search, X } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   Table,
   TableHeader,
@@ -90,22 +99,42 @@ const columns: ColumnDef<Ticket>[] = [
 
 export function TicketsTable() {
   const [sorting, setSorting] = useState<SortingState>([{ id: 'createdAt', desc: true }])
+  const [statusFilter, setStatusFilter] = useState<TicketStatus | 'all'>('all')
+  const [categoryFilter, setCategoryFilter] = useState<TicketCategory | 'all'>('all')
+  const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch] = useState('')
   const sortBy = sorting[0]?.id ?? 'createdAt'
   const sortOrder = sorting[0]?.desc ? 'desc' : 'asc'
+
+  useEffect(() => {
+    const timeout = setTimeout(() => setSearch(searchInput.trim()), 300)
+    return () => clearTimeout(timeout)
+  }, [searchInput])
 
   const {
     data,
     error,
     isPending,
   } = useQuery({
-    queryKey: ['tickets', sortBy, sortOrder],
+    queryKey: ['tickets', sortBy, sortOrder, statusFilter, categoryFilter, search],
     queryFn: () => {
       const params = new URLSearchParams({ sortBy, sortOrder })
+      if (statusFilter !== 'all') params.set('status', statusFilter)
+      if (categoryFilter !== 'all') params.set('category', categoryFilter)
+      if (search) params.set('search', search)
       return apiGet<{ tickets: Ticket[] }>(`/api/tickets?${params.toString()}`)
     },
   })
   const tickets = data?.tickets ?? null
   const errorMessage = error ? (error instanceof ApiError ? error.message : 'Failed to load tickets') : null
+
+  const hasFilters = statusFilter !== 'all' || categoryFilter !== 'all' || searchInput !== ''
+  const clearFilters = () => {
+    setStatusFilter('all')
+    setCategoryFilter('all')
+    setSearchInput('')
+    setSearch('')
+  }
 
   const table = useReactTable({
     data: tickets ?? [],
@@ -141,6 +170,56 @@ export function TicketsTable() {
 
   return (
     <>
+      <div className="mb-4 flex items-center gap-2">
+        <div className="relative w-64">
+          <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            placeholder="Search subject or requester..."
+            aria-label="Search tickets"
+            className="pl-8"
+          />
+        </div>
+        <Select
+          value={statusFilter}
+          onValueChange={(value) => setStatusFilter(value as TicketStatus | 'all')}
+        >
+          <SelectTrigger aria-label="Filter by status">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All statuses</SelectItem>
+            {Object.entries(STATUS_LABELS).map(([value, label]) => (
+              <SelectItem key={value} value={value}>
+                {label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={categoryFilter}
+          onValueChange={(value) => setCategoryFilter(value as TicketCategory | 'all')}
+        >
+          <SelectTrigger aria-label="Filter by category">
+            <SelectValue placeholder="Category" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All categories</SelectItem>
+            {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
+              <SelectItem key={value} value={value}>
+                {label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {hasFilters && (
+          <Button variant="ghost" size="sm" onClick={clearFilters}>
+            <X className="size-4" />
+            Clear filters
+          </Button>
+        )}
+      </div>
       {errorMessage && (
         <Alert variant="destructive">
           <AlertDescription>{errorMessage}</AlertDescription>
