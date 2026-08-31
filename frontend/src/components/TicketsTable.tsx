@@ -7,6 +7,7 @@ import {
   type ColumnDef,
   type SortingState,
 } from '@tanstack/react-table'
+import { Link } from 'react-router'
 import { ArrowUp, ArrowDown, ArrowUpDown, Search, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -29,8 +30,8 @@ import {
   TableCell,
 } from '@/components/ui/table'
 import { apiGet, ApiError } from '@/lib/api'
-import type { TicketStatus } from '@/lib/ticket-status'
-import type { TicketCategory } from '@/lib/ticket-category'
+import { STATUS_LABELS, STATUS_VARIANTS, type TicketStatus } from '@/lib/ticket-status'
+import { CATEGORY_LABELS, type TicketCategory } from '@/lib/ticket-category'
 
 type Ticket = {
   id: string
@@ -43,28 +44,22 @@ type Ticket = {
   updatedAt: string
 }
 
-const STATUS_LABELS: Record<TicketStatus, string> = {
-  open: 'Open',
-  resolved: 'Resolved',
-  closed: 'Closed',
-}
-
-const STATUS_VARIANTS: Record<TicketStatus, 'default' | 'secondary' | 'outline'> = {
-  open: 'default',
-  resolved: 'secondary',
-  closed: 'outline',
-}
-
-const CATEGORY_LABELS: Record<TicketCategory, string> = {
-  generalQuestion: 'General question',
-  technicalQuestion: 'Technical question',
-  refundRequest: 'Refund request',
-}
-
 const PAGE_SIZE = 10
 
 const columns: ColumnDef<Ticket>[] = [
-  { id: 'subject', accessorKey: 'subject', header: 'Subject' },
+  {
+    id: 'subject',
+    accessorKey: 'subject',
+    header: 'Subject',
+    cell: ({ row }) => (
+      <Link
+        to={`/tickets/${row.original.id}`}
+        className="font-medium text-primary hover:underline"
+      >
+        {row.original.subject}
+      </Link>
+    ),
+  },
   {
     id: 'requesterName',
     header: 'Requester',

@@ -61,6 +61,10 @@ describe('TicketsTable', () => {
     expect(within(refundRow).getByText('Bob')).toBeInTheDocument()
     expect(within(refundRow).getByText('Open')).toBeInTheDocument()
     expect(within(refundRow).getByText('Uncategorized')).toBeInTheDocument()
+    expect(within(refundRow).getByRole('link', { name: 'Refund please' })).toHaveAttribute(
+      'href',
+      '/tickets/1'
+    )
 
     const loginRow = screen.getByRole('row', { name: /Cannot log in/ })
     expect(within(loginRow).getByText('alice@example.com')).toBeInTheDocument()
