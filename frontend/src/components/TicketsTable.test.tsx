@@ -219,4 +219,64 @@ describe('TicketsTable', () => {
     const lastCallUrl = mockedApiGet.mock.calls.at(-1)?.[0]
     expect(lastCallUrl).toContain('category=technicalQuestion')
   })
+
+  it('sends page 1 and pageSize 10 by default', async () => {
+    mockedApiGet.mockResolvedValue({ tickets, total: 2 })
+
+    renderWithProviders(<TicketsTable />)
+
+    await screen.findByRole('row', { name: /Refund please/ })
+    const lastCallUrl = mockedApiGet.mock.calls.at(-1)?.[0]
+    expect(lastCallUrl).toContain('page=1')
+    expect(lastCallUrl).toContain('pageSize=10')
+  })
+
+  it('disables Previous on the first page and enables Next when more pages exist', async () => {
+    mockedApiGet.mockResolvedValue({ tickets, total: 25 })
+
+    renderWithProviders(<TicketsTable />)
+
+    await screen.findByRole('row', { name: /Refund please/ })
+    expect(screen.getByRole('button', { name: /previous/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /next/i })).toBeEnabled()
+    expect(screen.getByText('Page 1 of 3')).toBeInTheDocument()
+  })
+
+  it('requests the next page when Next is clicked', async () => {
+    const user = userEvent.setup()
+    mockedApiGet.mockResolvedValue({ tickets, total: 25 })
+
+    renderWithProviders(<TicketsTable />)
+
+    await screen.findByRole('row', { name: /Refund please/ })
+    await user.click(screen.getByRole('button', { name: /next/i }))
+
+    await waitFor(() => {
+      const lastCallUrl = mockedApiGet.mock.calls.at(-1)?.[0]
+      expect(lastCallUrl).toContain('page=2')
+    })
+    expect(screen.getByRole('button', { name: /previous/i })).toBeEnabled()
+  })
+
+  it('resets to page 1 when a filter changes', async () => {
+    const user = userEvent.setup()
+    mockedApiGet.mockResolvedValue({ tickets, total: 25 })
+
+    renderWithProviders(<TicketsTable />)
+
+    await screen.findByRole('row', { name: /Refund please/ })
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await waitFor(() => {
+      expect(mockedApiGet.mock.calls.at(-1)?.[0]).toContain('page=2')
+    })
+
+    await user.click(screen.getByRole('combobox', { name: /filter by status/i }))
+    await user.click(await screen.findByRole('option', { name: 'Open' }))
+
+    await waitFor(() => {
+      const lastCallUrl = mockedApiGet.mock.calls.at(-1)?.[0]
+      expect(lastCallUrl).toContain('page=1')
+      expect(lastCallUrl).toContain('status=open')
+    })
+  })
 })

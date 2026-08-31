@@ -7,7 +7,7 @@ import {
   type ColumnDef,
   type SortingState,
 } from '@tanstack/react-table'
-import { ArrowUp, ArrowDown, ArrowUpDown, Search, X } from 'lucide-react'
+import { ArrowUp, ArrowDown, ArrowUpDown, Search, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -61,6 +61,8 @@ const CATEGORY_LABELS: Record<TicketCategory, string> = {
   refundRequest: 'Refund request',
 }
 
+const PAGE_SIZE = 10
+
 const columns: ColumnDef<Ticket>[] = [
   { id: 'subject', accessorKey: 'subject', header: 'Subject' },
   {
@@ -103,6 +105,7 @@ export function TicketsTable() {
   const [categoryFilter, setCategoryFilter] = useState<TicketCategory | 'all'>('all')
   const [searchInput, setSearchInput] = useState('')
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
   const sortBy = sorting[0]?.id ?? 'createdAt'
   const sortOrder = sorting[0]?.desc ? 'desc' : 'asc'
 
@@ -111,21 +114,32 @@ export function TicketsTable() {
     return () => clearTimeout(timeout)
   }, [searchInput])
 
+  useEffect(() => {
+    setPage(1)
+  }, [sortBy, sortOrder, statusFilter, categoryFilter, search])
+
   const {
     data,
     error,
     isPending,
   } = useQuery({
-    queryKey: ['tickets', sortBy, sortOrder, statusFilter, categoryFilter, search],
+    queryKey: ['tickets', sortBy, sortOrder, statusFilter, categoryFilter, search, page],
     queryFn: () => {
-      const params = new URLSearchParams({ sortBy, sortOrder })
+      const params = new URLSearchParams({
+        sortBy,
+        sortOrder,
+        page: String(page),
+        pageSize: String(PAGE_SIZE),
+      })
       if (statusFilter !== 'all') params.set('status', statusFilter)
       if (categoryFilter !== 'all') params.set('category', categoryFilter)
       if (search) params.set('search', search)
-      return apiGet<{ tickets: Ticket[] }>(`/api/tickets?${params.toString()}`)
+      return apiGet<{ tickets: Ticket[]; total: number }>(`/api/tickets?${params.toString()}`)
     },
   })
   const tickets = data?.tickets ?? null
+  const total = data?.total ?? 0
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
   const errorMessage = error ? (error instanceof ApiError ? error.message : 'Failed to load tickets') : null
 
   const hasFilters = statusFilter !== 'all' || categoryFilter !== 'all' || searchInput !== ''
@@ -273,6 +287,36 @@ export function TicketsTable() {
             ))}
           </TableBody>
         </Table>
+      )}
+      {!errorMessage && tickets !== null && tickets.length > 0 && (
+        <div className="mt-4 flex items-center justify-between">
+          <p className="text-sm text-muted-foreground">
+            Showing {(page - 1) * PAGE_SIZE + 1}-{(page - 1) * PAGE_SIZE + tickets.length} of {total}
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => p - 1)}
+              disabled={page <= 1}
+            >
+              <ChevronLeft className="size-4" />
+              Previous
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Page {page} of {totalPages}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((p) => p + 1)}
+              disabled={page >= totalPages}
+            >
+              Next
+              <ChevronRight className="size-4" />
+            </Button>
+          </div>
+        </div>
       )}
     </>
   )
