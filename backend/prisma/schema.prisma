@@ -31,6 +31,8 @@ model User {
 
   role Role @default(agent)
 
+  assignedTickets Ticket[]
+
   @@map("user")
 }
 
@@ -105,20 +107,23 @@ enum TicketCategory {
 }
 
 model Ticket {
-  id             String          @id @default(cuid())
-  subject        String
-  status         TicketStatus    @default(open)
-  category       TicketCategory?
-  requesterEmail String
-  requesterName  String?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  messages       Message[]
+  id              String          @id @default(cuid())
+  subject         String
+  status          TicketStatus    @default(open)
+  category        TicketCategory?
+  requesterEmail  String
+  requesterName   String?
+  assignedAgentId String?
+  assignedAgent   User?           @relation(fields: [assignedAgentId], references: [id])
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  messages        Message[]
 
   @@index([requesterEmail])
   @@index([status])
   @@index([category])
   @@index([createdAt])
+  @@index([assignedAgentId])
   @@map("ticket")
 }
 

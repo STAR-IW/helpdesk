@@ -1,4 +1,5 @@
 import { createBrowserRouter } from 'react-router'
+import { Role } from './lib/api'
 import { LoginPage } from './pages/LoginPage'
 import { HomePage } from './pages/HomePage'
 import { TicketsPage } from './pages/TicketsPage'
@@ -32,7 +33,7 @@ function ProtectedTicketDetail() {
 
 function ProtectedUsers() {
   return (
-    <ProtectedRoute role="admin">
+    <ProtectedRoute role={Role.admin}>
       <UsersPage />
     </ProtectedRoute>
   )

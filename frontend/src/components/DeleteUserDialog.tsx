@@ -13,7 +13,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { apiDelete, ApiError, type Role } from '@/lib/api'
+import { apiDelete, ApiError, Role } from '@/lib/api'
 
 type DeletableUser = {
   id: string
@@ -25,7 +25,7 @@ export function DeleteUserDialog({ user }: { user: DeletableUser }) {
   const [open, setOpen] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
   const queryClient = useQueryClient()
-  const isAdmin = user.role === 'admin'
+  const isAdmin = user.role === Role.admin
 
   const mutation = useMutation({
     mutationFn: () => apiDelete(`/api/users/${user.id}`),

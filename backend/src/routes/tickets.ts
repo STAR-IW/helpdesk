@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../db.js';
-import { requireAuth } from '../middleware/require-auth.js';
+import { requireAuth, requireAdmin } from '../middleware/require-auth.js';
 import { TicketStatus, TicketCategory } from '../generated/prisma/enums.js';
+import { Prisma } from '../generated/prisma/client.js';
 
 export const ticketsRouter = Router();
 
@@ -76,6 +77,7 @@ ticketsRouter.get<{ id: string }>('/:id', requireAuth, async (req, res) => {
       category: true,
       requesterEmail: true,
       requesterName: true,
+      assignedAgent: { select: { id: true, name: true, email: true } },
       createdAt: true,
       updatedAt: true,
       messages: {
@@ -98,4 +100,55 @@ ticketsRouter.get<{ id: string }>('/:id', requireAuth, async (req, res) => {
   }
 
   res.json({ ticket });
+});
+
+const assignTicketSchema = z.object({
+  agentId: z.string().min(1).nullable(),
+});
+
+ticketsRouter.patch<{ id: string }>('/:id/assign', requireAuth, requireAdmin, async (req, res) => {
+  const parsed = assignTicketSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0].message });
+    return;
+  }
+  const { agentId } = parsed.data;
+  const { id } = req.params;
+
+  if (agentId) {
+    const agent = await prisma.user.findUnique({
+      where: { id: agentId },
+      select: { deletedAt: true },
+    });
+    if (!agent || agent.deletedAt) {
+      res.status(400).json({ error: 'Agent not found' });
+      return;
+    }
+  }
+
+  try {
+    const ticket = await prisma.ticket.update({
+      where: { id },
+      data: { assignedAgentId: agentId },
+      select: {
+        id: true,
+        subject: true,
+        status: true,
+        category: true,
+        requesterEmail: true,
+        requesterName: true,
+        assignedAgent: { select: { id: true, name: true, email: true } },
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+    res.json({ ticket });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2025') {
+      res.status(404).json({ error: 'Ticket not found' });
+      return;
+    }
+    console.error(err);
+    res.status(500).json({ error: 'Failed to assign ticket' });
+  }
 });

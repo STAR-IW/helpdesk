@@ -15,7 +15,7 @@ import {
   TableHead,
   TableCell,
 } from '@/components/ui/table'
-import { apiGet, ApiError, type Role } from '@/lib/api'
+import { apiGet, ApiError, Role } from '@/lib/api'
 
 type User = {
   id: string
@@ -113,7 +113,7 @@ export function UsersPage() {
                       <TableCell>{user.name}</TableCell>
                       <TableCell>{user.email}</TableCell>
                       <TableCell>
-                        <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
+                        <Badge variant={user.role === Role.admin ? 'default' : 'secondary'}>
                           {user.role}
                         </Badge>
                       </TableCell>

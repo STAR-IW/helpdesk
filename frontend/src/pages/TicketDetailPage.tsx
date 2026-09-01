@@ -1,14 +1,24 @@
 import { Link, useParams } from 'react-router'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft } from 'lucide-react'
 import { Navbar } from '@/components/Navbar'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
-import { apiGet, ApiError } from '@/lib/api'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { apiGet, apiPatch, ApiError, Role } from '@/lib/api'
+import { useSession } from '@/lib/auth-client'
 import { STATUS_LABELS, STATUS_VARIANTS, type TicketStatus } from '@/lib/ticket-status'
 import { CATEGORY_LABELS, type TicketCategory } from '@/lib/ticket-category'
+
+const UNASSIGNED = 'unassigned'
 
 type Message = {
   id: string
@@ -19,6 +29,11 @@ type Message = {
   createdAt: string
 }
 
+type Agent = {
+  id: string
+  name: string
+}
+
 type TicketDetail = {
   id: string
   subject: string
@@ -26,6 +41,7 @@ type TicketDetail = {
   category: TicketCategory | null
   requesterEmail: string
   requesterName: string | null
+  assignedAgent: Agent | null
   createdAt: string
   updatedAt: string
   messages: Message[]
@@ -33,6 +49,9 @@ type TicketDetail = {
 
 export function TicketDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const { data: session } = useSession()
+  const isAdmin = session?.user.role === Role.admin
+  const queryClient = useQueryClient()
 
   const {
     data,
@@ -44,6 +63,21 @@ export function TicketDetailPage() {
   })
   const ticket = data?.ticket ?? null
   const errorMessage = error ? (error instanceof ApiError ? error.message : 'Failed to load ticket') : null
+
+  const { data: agentsData } = useQuery({
+    queryKey: ['users'],
+    queryFn: () => apiGet<{ users: Agent[] }>('/api/users'),
+    enabled: isAdmin,
+  })
+  const agents = agentsData?.users ?? []
+
+  const assignMutation = useMutation({
+    mutationFn: (agentId: string | null) =>
+      apiPatch<{ ticket: TicketDetail }>(`/api/tickets/${id}/assign`, { agentId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ticket', id] })
+    },
+  })
 
   return (
     <div className="min-h-screen bg-background">
@@ -93,6 +127,42 @@ export function TicketDetailPage() {
                   {ticket.requesterName ? `${ticket.requesterName} · ` : ''}
                   {ticket.requesterEmail}
                 </p>
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="text-muted-foreground">Assigned to:</span>
+                  {isAdmin ? (
+                    <Select
+                      items={[
+                        { value: UNASSIGNED, label: 'Unassigned' },
+                        ...agents.map((agent) => ({ value: agent.id, label: agent.name })),
+                      ]}
+                      value={ticket.assignedAgent?.id ?? UNASSIGNED}
+                      onValueChange={(value) =>
+                        assignMutation.mutate(value === UNASSIGNED ? null : value)
+                      }
+                    >
+                      <SelectTrigger aria-label="Assigned agent" size="sm">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
+                        {agents.map((agent) => (
+                          <SelectItem key={agent.id} value={agent.id}>
+                            {agent.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <span>{ticket.assignedAgent?.name ?? 'Unassigned'}</span>
+                  )}
+                  {assignMutation.isError && (
+                    <span className="text-destructive">
+                      {assignMutation.error instanceof ApiError
+                        ? assignMutation.error.message
+                        : 'Failed to assign ticket'}
+                    </span>
+                  )}
+                </div>
                 <p className="text-sm text-muted-foreground">
                   Created {new Date(ticket.createdAt).toLocaleDateString()} · Updated{' '}
                   {new Date(ticket.updatedAt).toLocaleDateString()}

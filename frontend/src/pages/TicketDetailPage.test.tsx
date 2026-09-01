@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Routes, Route } from 'react-router'
 import { TicketDetailPage } from './TicketDetailPage'
-import { apiGet, ApiError } from '@/lib/api'
+import { apiGet, apiPatch, ApiError } from '@/lib/api'
+import { useSession } from '@/lib/auth-client'
 
 vi.mock('@/components/Navbar', () => ({
   Navbar: () => null,
@@ -15,10 +16,17 @@ vi.mock('@/lib/api', async () => {
   return {
     ...actual,
     apiGet: vi.fn(),
+    apiPatch: vi.fn(),
   }
 })
 
+vi.mock('@/lib/auth-client', () => ({
+  useSession: vi.fn(),
+}))
+
 const mockedApiGet = vi.mocked(apiGet)
+const mockedApiPatch = vi.mocked(apiPatch)
+const mockedUseSession = vi.mocked(useSession)
 
 const ticket = {
   id: '1',
@@ -27,6 +35,7 @@ const ticket = {
   category: 'refundRequest' as const,
   requesterEmail: 'bob@example.com',
   requesterName: 'Bob',
+  assignedAgent: null,
   createdAt: '2026-02-20T00:00:00.000Z',
   updatedAt: '2026-02-21T00:00:00.000Z',
   messages: [
@@ -49,6 +58,17 @@ const ticket = {
   ],
 }
 
+const agents = [
+  { id: 'agent-1', name: 'Alice Agent' },
+  { id: 'agent-2', name: 'Charlie Agent' },
+]
+
+function mockSession(role: 'admin' | 'agent') {
+  mockedUseSession.mockReturnValue({
+    data: { user: { role } },
+  } as unknown as ReturnType<typeof useSession>)
+}
+
 function renderPage(id = '1') {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
@@ -65,6 +85,8 @@ function renderPage(id = '1') {
 
 beforeEach(() => {
   mockedApiGet.mockReset()
+  mockedApiPatch.mockReset()
+  mockSession('agent')
 })
 
 describe('TicketDetailPage', () => {
@@ -148,5 +170,78 @@ describe('TicketDetailPage', () => {
     await user.click(screen.getByRole('link', { name: /back to tickets/i }))
 
     expect(await screen.findByText('Tickets List')).toBeInTheDocument()
+  })
+
+  describe('ticket assignment', () => {
+    it('shows the assignee as read-only text for a non-admin, with no dropdown', async () => {
+      mockSession('agent')
+      mockedApiGet.mockResolvedValue({ ticket: { ...ticket, assignedAgent: agents[0] } })
+
+      renderPage()
+
+      await screen.findByText('Refund please', { selector: '[data-slot="card-title"]' })
+      expect(screen.getByText('Alice Agent')).toBeInTheDocument()
+      expect(screen.queryByRole('combobox', { name: /assigned agent/i })).not.toBeInTheDocument()
+      expect(mockedApiGet).not.toHaveBeenCalledWith('/api/users')
+    })
+
+    it('shows "Unassigned" for a non-admin when no agent is assigned', async () => {
+      mockSession('agent')
+      mockedApiGet.mockResolvedValue({ ticket })
+
+      renderPage()
+
+      await screen.findByText('Refund please', { selector: '[data-slot="card-title"]' })
+      expect(screen.getByText('Unassigned')).toBeInTheDocument()
+    })
+
+    it('lets an admin reassign the ticket via the dropdown', async () => {
+      mockSession('admin')
+      let currentTicket: Omit<typeof ticket, 'assignedAgent'> & {
+        assignedAgent: { id: string; name: string } | null
+      } = ticket
+      mockedApiGet.mockImplementation((path: string) => {
+        if (path === '/api/users') return Promise.resolve({ users: agents })
+        return Promise.resolve({ ticket: currentTicket })
+      })
+      mockedApiPatch.mockImplementation(async (_path, body) => {
+        const { agentId } = body as { agentId: string | null }
+        currentTicket = {
+          ...ticket,
+          assignedAgent: agents.find((agent) => agent.id === agentId) ?? null,
+        }
+        return { ticket: currentTicket }
+      })
+      const user = userEvent.setup()
+
+      renderPage()
+
+      await screen.findByText('Refund please', { selector: '[data-slot="card-title"]' })
+      const select = screen.getByRole('combobox', { name: /assigned agent/i })
+      await user.click(select)
+      await user.click(await screen.findByRole('option', { name: 'Alice Agent' }))
+
+      expect(mockedApiPatch).toHaveBeenCalledWith('/api/tickets/1/assign', { agentId: 'agent-1' })
+      await waitFor(() => expect(select).toHaveTextContent('Alice Agent'))
+    })
+
+    it('shows an error when assigning fails', async () => {
+      mockSession('admin')
+      mockedApiGet.mockImplementation((path: string) => {
+        if (path === '/api/users') return Promise.resolve({ users: agents })
+        return Promise.resolve({ ticket })
+      })
+      mockedApiPatch.mockRejectedValue(new ApiError(400, 'Agent not found'))
+      const user = userEvent.setup()
+
+      renderPage()
+
+      await screen.findByText('Refund please', { selector: '[data-slot="card-title"]' })
+      const select = screen.getByRole('combobox', { name: /assigned agent/i })
+      await user.click(select)
+      await user.click(await screen.findByRole('option', { name: 'Alice Agent' }))
+
+      expect(await screen.findByText('Agent not found')).toBeInTheDocument()
+    })
   })
 })

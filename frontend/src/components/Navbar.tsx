@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router'
 import { authClient, useSession } from '../lib/auth-client'
 import { Button } from '@/components/ui/button'
+import { Role } from '@/lib/api'
 
 export function Navbar() {
   const navigate = useNavigate()
@@ -27,7 +28,7 @@ export function Navbar() {
         <Button variant="ghost" size="sm" onClick={() => navigate('/tickets')}>
           Tickets
         </Button>
-        {session?.user.role === 'admin' && (
+        {session?.user.role === Role.admin && (
           <Button variant="ghost" size="sm" onClick={() => navigate('/users')}>
             Users
           </Button>
