@@ -30,6 +30,7 @@ import {
   TableCell,
 } from '@/components/ui/table'
 import { apiGet, ApiError } from '@/lib/api'
+import { cn } from '@/lib/utils'
 import { STATUS_LABELS, STATUS_VARIANTS, type TicketStatus } from '@/lib/ticket-status'
 import { CATEGORY_LABELS, type TicketCategory } from '@/lib/ticket-category'
 
@@ -45,6 +46,14 @@ type Ticket = {
 }
 
 const PAGE_SIZE = 10
+
+// Subject has no fixed width, so it fills the remaining space (table-fixed layout).
+const COLUMN_WIDTHS: Record<string, string> = {
+  requesterName: 'w-48',
+  status: 'w-28',
+  category: 'w-40',
+  createdAt: 'w-32',
+}
 
 const columns: ColumnDef<Ticket>[] = [
   {
@@ -161,6 +170,7 @@ export function TicketsTable() {
     return (
       <TableHead
         key={header.id}
+        className={COLUMN_WIDTHS[header.column.id]}
         aria-sort={sorted === 'asc' ? 'ascending' : sorted === 'desc' ? 'descending' : 'none'}
       >
         <button
@@ -235,7 +245,7 @@ export function TicketsTable() {
         </Alert>
       )}
       {!errorMessage && isPending && (
-        <Table>
+        <Table className="table-fixed">
           <TableHeader>
             <TableRow>{headerCells}</TableRow>
           </TableHeader>
@@ -245,16 +255,16 @@ export function TicketsTable() {
                 <TableCell>
                   <Skeleton className="h-4 w-48" />
                 </TableCell>
-                <TableCell>
+                <TableCell className={COLUMN_WIDTHS.requesterName}>
                   <Skeleton className="h-4 w-40" />
                 </TableCell>
-                <TableCell>
+                <TableCell className={COLUMN_WIDTHS.status}>
                   <Skeleton className="h-5 w-14 rounded-4xl" />
                 </TableCell>
-                <TableCell>
+                <TableCell className={COLUMN_WIDTHS.category}>
                   <Skeleton className="h-5 w-28 rounded-4xl" />
                 </TableCell>
-                <TableCell>
+                <TableCell className={COLUMN_WIDTHS.createdAt}>
                   <Skeleton className="h-4 w-20" />
                 </TableCell>
               </TableRow>
@@ -266,7 +276,7 @@ export function TicketsTable() {
         <p className="text-sm text-muted-foreground">No tickets found.</p>
       )}
       {!errorMessage && tickets !== null && tickets.length > 0 && (
-        <Table>
+        <Table className="table-fixed">
           <TableHeader>
             <TableRow>{headerCells}</TableRow>
           </TableHeader>
@@ -274,7 +284,10 @@ export function TicketsTable() {
             {table.getRowModel().rows.map((row) => (
               <TableRow key={row.id}>
                 {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id}>
+                  <TableCell
+                    key={cell.id}
+                    className={cn(COLUMN_WIDTHS[cell.column.id], COLUMN_WIDTHS[cell.column.id] && 'truncate')}
+                  >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </TableCell>
                 ))}
