@@ -4,7 +4,6 @@ import { ArrowLeft } from 'lucide-react'
 import { Navbar } from '@/components/Navbar'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Select,
@@ -15,10 +14,11 @@ import {
 } from '@/components/ui/select'
 import { apiGet, apiPatch, ApiError, Role } from '@/lib/api'
 import { useSession } from '@/lib/auth-client'
-import { STATUS_LABELS, STATUS_VARIANTS, type TicketStatus } from '@/lib/ticket-status'
+import { STATUS_LABELS, type TicketStatus } from '@/lib/ticket-status'
 import { CATEGORY_LABELS, type TicketCategory } from '@/lib/ticket-category'
 
 const UNASSIGNED = 'unassigned'
+const UNCATEGORIZED = 'uncategorized'
 
 type Message = {
   id: string
@@ -73,7 +73,23 @@ export function TicketDetailPage() {
 
   const assignMutation = useMutation({
     mutationFn: (agentId: string | null) =>
-      apiPatch<{ ticket: TicketDetail }>(`/api/tickets/${id}/assign`, { agentId }),
+      apiPatch<{ ticket: TicketDetail }>(`/api/tickets/${id}`, { agentId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ticket', id] })
+    },
+  })
+
+  const statusMutation = useMutation({
+    mutationFn: (status: TicketStatus) =>
+      apiPatch<{ ticket: TicketDetail }>(`/api/tickets/${id}`, { status }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ticket', id] })
+    },
+  })
+
+  const categoryMutation = useMutation({
+    mutationFn: (category: TicketCategory | null) =>
+      apiPatch<{ ticket: TicketDetail }>(`/api/tickets/${id}`, { category }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['ticket', id] })
     },
@@ -82,7 +98,7 @@ export function TicketDetailPage() {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      <main className="space-y-4 p-6">
+      <main className="mx-auto max-w-5xl space-y-4 p-6">
         <Link
           to="/tickets"
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
@@ -108,94 +124,163 @@ export function TicketDetailPage() {
           </Card>
         )}
         {!errorMessage && ticket && (
-          <>
-            <Card>
-              <CardHeader>
-                <CardTitle>{ticket.subject}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <Badge variant={STATUS_VARIANTS[ticket.status]}>{STATUS_LABELS[ticket.status]}</Badge>
-                  {ticket.category ? (
-                    <Badge variant="outline">{CATEGORY_LABELS[ticket.category]}</Badge>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_220px]">
+            <div className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>{ticket.subject}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-sm">
+                    <span className="text-muted-foreground">Requester: </span>
+                    {ticket.requesterName ? `${ticket.requesterName} · ` : ''}
+                    {ticket.requesterEmail}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Created {new Date(ticket.createdAt).toLocaleDateString()} · Updated{' '}
+                    {new Date(ticket.updatedAt).toLocaleDateString()}
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Messages</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {ticket.messages.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No messages yet.</p>
                   ) : (
-                    <span className="text-sm text-muted-foreground">Uncategorized</span>
+                    <div className="space-y-4">
+                      {ticket.messages.map((message) => (
+                        <div key={message.id} className="rounded-lg border border-border p-3">
+                          <div className="mb-1 flex items-center justify-between text-sm">
+                            <span className="font-medium">
+                              {message.fromName ?? message.fromEmail} → {message.toEmail}
+                            </span>
+                            <span className="text-muted-foreground">
+                              {new Date(message.createdAt).toLocaleString()}
+                            </span>
+                          </div>
+                          <p className="text-sm whitespace-pre-wrap">{message.body}</p>
+                        </div>
+                      ))}
+                    </div>
                   )}
-                </div>
-                <p className="text-sm">
-                  <span className="text-muted-foreground">Requester: </span>
-                  {ticket.requesterName ? `${ticket.requesterName} · ` : ''}
-                  {ticket.requesterEmail}
-                </p>
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="text-muted-foreground">Assigned to:</span>
-                  {isAdmin ? (
+                </CardContent>
+              </Card>
+            </div>
+            <div className="space-y-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Properties</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="space-y-1">
+                    <span className="text-sm text-muted-foreground">Status</span>
                     <Select
-                      items={[
-                        { value: UNASSIGNED, label: 'Unassigned' },
-                        ...agents.map((agent) => ({ value: agent.id, label: agent.name })),
-                      ]}
-                      value={ticket.assignedAgent?.id ?? UNASSIGNED}
-                      onValueChange={(value) =>
-                        assignMutation.mutate(value === UNASSIGNED ? null : value)
-                      }
+                      items={Object.entries(STATUS_LABELS).map(([value, label]) => ({
+                        value,
+                        label,
+                      }))}
+                      value={ticket.status}
+                      onValueChange={(value) => statusMutation.mutate(value as TicketStatus)}
                     >
-                      <SelectTrigger aria-label="Assigned agent" size="sm">
+                      <SelectTrigger aria-label="Ticket status" size="sm" className="w-full">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
-                        {agents.map((agent) => (
-                          <SelectItem key={agent.id} value={agent.id}>
-                            {agent.name}
+                        {Object.entries(STATUS_LABELS).map(([value, label]) => (
+                          <SelectItem key={value} value={value}>
+                            {label}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                  ) : (
-                    <span>{ticket.assignedAgent?.name ?? 'Unassigned'}</span>
-                  )}
-                  {assignMutation.isError && (
-                    <span className="text-destructive">
-                      {assignMutation.error instanceof ApiError
-                        ? assignMutation.error.message
-                        : 'Failed to assign ticket'}
-                    </span>
-                  )}
-                </div>
-                <p className="text-sm text-muted-foreground">
-                  Created {new Date(ticket.createdAt).toLocaleDateString()} · Updated{' '}
-                  {new Date(ticket.updatedAt).toLocaleDateString()}
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Messages</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {ticket.messages.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No messages yet.</p>
-                ) : (
-                  <div className="space-y-4">
-                    {ticket.messages.map((message) => (
-                      <div key={message.id} className="rounded-lg border border-border p-3">
-                        <div className="mb-1 flex items-center justify-between text-sm">
-                          <span className="font-medium">
-                            {message.fromName ?? message.fromEmail} → {message.toEmail}
-                          </span>
-                          <span className="text-muted-foreground">
-                            {new Date(message.createdAt).toLocaleString()}
-                          </span>
-                        </div>
-                        <p className="text-sm whitespace-pre-wrap">{message.body}</p>
-                      </div>
-                    ))}
+                    {statusMutation.isError && (
+                      <p className="text-sm text-destructive">
+                        {statusMutation.error instanceof ApiError
+                          ? statusMutation.error.message
+                          : 'Failed to update ticket'}
+                      </p>
+                    )}
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          </>
+                  <div className="space-y-1">
+                    <span className="text-sm text-muted-foreground">Category</span>
+                    <Select
+                      items={[
+                        { value: UNCATEGORIZED, label: 'Uncategorized' },
+                        ...Object.entries(CATEGORY_LABELS).map(([value, label]) => ({
+                          value,
+                          label,
+                        })),
+                      ]}
+                      value={ticket.category ?? UNCATEGORIZED}
+                      onValueChange={(value) =>
+                        categoryMutation.mutate(
+                          value === UNCATEGORIZED ? null : (value as TicketCategory)
+                        )
+                      }
+                    >
+                      <SelectTrigger aria-label="Ticket category" size="sm" className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={UNCATEGORIZED}>Uncategorized</SelectItem>
+                        {Object.entries(CATEGORY_LABELS).map(([value, label]) => (
+                          <SelectItem key={value} value={value}>
+                            {label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {categoryMutation.isError && (
+                      <p className="text-sm text-destructive">
+                        {categoryMutation.error instanceof ApiError
+                          ? categoryMutation.error.message
+                          : 'Failed to update ticket'}
+                      </p>
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-sm text-muted-foreground">Assigned to</span>
+                    {isAdmin ? (
+                      <Select
+                        items={[
+                          { value: UNASSIGNED, label: 'Unassigned' },
+                          ...agents.map((agent) => ({ value: agent.id, label: agent.name })),
+                        ]}
+                        value={ticket.assignedAgent?.id ?? UNASSIGNED}
+                        onValueChange={(value) =>
+                          assignMutation.mutate(value === UNASSIGNED ? null : value)
+                        }
+                      >
+                        <SelectTrigger aria-label="Assigned agent" size="sm" className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={UNASSIGNED}>Unassigned</SelectItem>
+                          {agents.map((agent) => (
+                            <SelectItem key={agent.id} value={agent.id}>
+                              {agent.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <p className="text-sm">{ticket.assignedAgent?.name ?? 'Unassigned'}</p>
+                    )}
+                    {assignMutation.isError && (
+                      <p className="text-sm text-destructive">
+                        {assignMutation.error instanceof ApiError
+                          ? assignMutation.error.message
+                          : 'Failed to assign ticket'}
+                      </p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         )}
       </main>
     </div>

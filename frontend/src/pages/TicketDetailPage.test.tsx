@@ -6,6 +6,7 @@ import { MemoryRouter, Routes, Route } from 'react-router'
 import { TicketDetailPage } from './TicketDetailPage'
 import { apiGet, apiPatch, ApiError } from '@/lib/api'
 import { useSession } from '@/lib/auth-client'
+import type { TicketCategory } from '@/lib/ticket-category'
 
 vi.mock('@/components/Navbar', () => ({
   Navbar: () => null,
@@ -221,7 +222,7 @@ describe('TicketDetailPage', () => {
       await user.click(select)
       await user.click(await screen.findByRole('option', { name: 'Alice Agent' }))
 
-      expect(mockedApiPatch).toHaveBeenCalledWith('/api/tickets/1/assign', { agentId: 'agent-1' })
+      expect(mockedApiPatch).toHaveBeenCalledWith('/api/tickets/1', { agentId: 'agent-1' })
       await waitFor(() => expect(select).toHaveTextContent('Alice Agent'))
     })
 
@@ -242,6 +243,66 @@ describe('TicketDetailPage', () => {
       await user.click(await screen.findByRole('option', { name: 'Alice Agent' }))
 
       expect(await screen.findByText('Agent not found')).toBeInTheDocument()
+    })
+  })
+
+  describe('status and category', () => {
+    it('lets any authenticated user change the status via the dropdown', async () => {
+      mockSession('agent')
+      let currentTicket = ticket
+      mockedApiGet.mockImplementation(() => Promise.resolve({ ticket: currentTicket }))
+      mockedApiPatch.mockImplementation(async (_path, body) => {
+        currentTicket = { ...currentTicket, ...(body as Partial<typeof ticket>) }
+        return { ticket: currentTicket }
+      })
+      const user = userEvent.setup()
+
+      renderPage()
+
+      await screen.findByText('Refund please', { selector: '[data-slot="card-title"]' })
+      const select = screen.getByRole('combobox', { name: /ticket status/i })
+      await user.click(select)
+      await user.click(await screen.findByRole('option', { name: 'Resolved' }))
+
+      expect(mockedApiPatch).toHaveBeenCalledWith('/api/tickets/1', { status: 'resolved' })
+      await waitFor(() => expect(select).toHaveTextContent('Resolved'))
+    })
+
+    it('lets a user clear the category back to Uncategorized', async () => {
+      mockSession('agent')
+      let currentTicket: Omit<typeof ticket, 'category'> & { category: TicketCategory | null } =
+        ticket
+      mockedApiGet.mockImplementation(() => Promise.resolve({ ticket: currentTicket }))
+      mockedApiPatch.mockImplementation(async (_path, body) => {
+        currentTicket = { ...currentTicket, ...(body as { category: TicketCategory | null }) }
+        return { ticket: currentTicket }
+      })
+      const user = userEvent.setup()
+
+      renderPage()
+
+      await screen.findByText('Refund please', { selector: '[data-slot="card-title"]' })
+      const select = screen.getByRole('combobox', { name: /ticket category/i })
+      await user.click(select)
+      await user.click(await screen.findByRole('option', { name: 'Uncategorized' }))
+
+      expect(mockedApiPatch).toHaveBeenCalledWith('/api/tickets/1', { category: null })
+      await waitFor(() => expect(select).toHaveTextContent('Uncategorized'))
+    })
+
+    it('shows an error when updating the status fails', async () => {
+      mockedApiGet.mockResolvedValue({ ticket })
+      mockedApiPatch.mockRejectedValue(new ApiError(400, 'Invalid status'))
+      const user = userEvent.setup()
+
+      renderPage()
+
+      await screen.findByText('Refund please', { selector: '[data-slot="card-title"]' })
+      const select = screen.getByRole('combobox', { name: /ticket status/i })
+      await user.click(select)
+      await user.click(await screen.findByRole('option', { name: 'Closed' }))
+
+      expect(await screen.findByText('Invalid status')).toBeInTheDocument()
     })
   })
 })

@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../db.js';
-import { requireAuth, requireAdmin } from '../middleware/require-auth.js';
-import { TicketStatus, TicketCategory } from '../generated/prisma/enums.js';
+import { requireAuth } from '../middleware/require-auth.js';
+import { TicketStatus, TicketCategory, Role } from '../generated/prisma/enums.js';
 import { Prisma } from '../generated/prisma/client.js';
 
 export const ticketsRouter = Router();
@@ -102,18 +102,30 @@ ticketsRouter.get<{ id: string }>('/:id', requireAuth, async (req, res) => {
   res.json({ ticket });
 });
 
-const assignTicketSchema = z.object({
-  agentId: z.string().min(1).nullable(),
-});
+const updateTicketSchema = z
+  .object({
+    status: z.enum(TicketStatus).optional(),
+    category: z.enum(TicketCategory).nullable().optional(),
+    agentId: z.string().min(1).nullable().optional(),
+  })
+  .refine(
+    (data) => data.status !== undefined || data.category !== undefined || data.agentId !== undefined,
+    { message: 'At least one of status, category, or agentId is required' }
+  );
 
-ticketsRouter.patch<{ id: string }>('/:id/assign', requireAuth, requireAdmin, async (req, res) => {
-  const parsed = assignTicketSchema.safeParse(req.body);
+ticketsRouter.patch<{ id: string }>('/:id', requireAuth, async (req, res) => {
+  const parsed = updateTicketSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.issues[0].message });
     return;
   }
-  const { agentId } = parsed.data;
+  const { status, category, agentId } = parsed.data;
   const { id } = req.params;
+
+  if (agentId !== undefined && req.user?.role !== Role.admin) {
+    res.status(403).json({ error: 'Forbidden' });
+    return;
+  }
 
   if (agentId) {
     const agent = await prisma.user.findUnique({
@@ -129,7 +141,11 @@ ticketsRouter.patch<{ id: string }>('/:id/assign', requireAuth, requireAdmin, as
   try {
     const ticket = await prisma.ticket.update({
       where: { id },
-      data: { assignedAgentId: agentId },
+      data: {
+        ...(status !== undefined && { status }),
+        ...(category !== undefined && { category }),
+        ...(agentId !== undefined && { assignedAgentId: agentId }),
+      },
       select: {
         id: true,
         subject: true,
@@ -149,6 +165,6 @@ ticketsRouter.patch<{ id: string }>('/:id/assign', requireAuth, requireAdmin, as
       return;
     }
     console.error(err);
-    res.status(500).json({ error: 'Failed to assign ticket' });
+    res.status(500).json({ error: 'Failed to update ticket' });
   }
 });
