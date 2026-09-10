@@ -9,6 +9,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { apiPatch, ApiError } from '@/lib/api'
+import { sanitizeHtml } from '@/lib/sanitize'
 import { STATUS_LABELS, type TicketStatus } from '@/constants/ticket-status'
 import { CATEGORY_LABELS, type TicketCategory } from '@/constants/ticket-category'
 import type { TicketDetail } from '@/constants/ticket'
@@ -89,7 +90,14 @@ export function TicketDetails({ ticket, isAdmin, agents, children }: TicketDetai
                         {new Date(message.createdAt).toLocaleString()}
                       </span>
                     </div>
-                    <p className="text-sm whitespace-pre-wrap">{message.body}</p>
+                    {message.bodyHtml ? (
+                      <div
+                        className="text-sm [&_a]:underline"
+                        dangerouslySetInnerHTML={{ __html: sanitizeHtml(message.bodyHtml) }}
+                      />
+                    ) : (
+                      <p className="text-sm whitespace-pre-wrap">{message.body}</p>
+                    )}
                   </div>
                 ))}
               </div>

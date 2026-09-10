@@ -1,5 +1,6 @@
 import { SENDER_TYPE_LABELS } from '@/constants/reply-sender-type'
 import type { Reply } from '@/constants/reply'
+import { sanitizeHtml } from '@/lib/sanitize'
 
 type ReplyThreadProps = {
   replies: Reply[]
@@ -27,7 +28,14 @@ export function ReplyThread({ replies, requesterName, requesterEmail }: ReplyThr
               {new Date(reply.createdAt).toLocaleString()}
             </span>
           </div>
-          <p className="text-sm whitespace-pre-wrap">{reply.body}</p>
+          {reply.bodyHtml ? (
+            <div
+              className="text-sm [&_a]:underline"
+              dangerouslySetInnerHTML={{ __html: sanitizeHtml(reply.bodyHtml) }}
+            />
+          ) : (
+            <p className="text-sm whitespace-pre-wrap">{reply.body}</p>
+          )}
         </div>
       ))}
     </div>

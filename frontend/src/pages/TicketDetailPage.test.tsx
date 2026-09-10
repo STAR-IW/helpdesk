@@ -48,6 +48,7 @@ const ticket = {
       fromName: 'Bob',
       toEmail: 'support@example.com',
       body: 'Please refund my order.',
+      bodyHtml: null,
       createdAt: '2026-02-20T09:00:00.000Z',
     },
     {
@@ -56,6 +57,7 @@ const ticket = {
       fromName: null,
       toEmail: 'bob@example.com',
       body: "We're looking into it.",
+      bodyHtml: null,
       createdAt: '2026-02-20T10:00:00.000Z',
     },
   ],
@@ -64,6 +66,7 @@ const ticket = {
       id: 'r1',
       senderType: 'agent' as const,
       body: 'Thanks for reaching out, refund is on the way.',
+      bodyHtml: null,
       author: { id: 'agent-3', name: 'Priya Support' },
       createdAt: '2026-02-20T11:00:00.000Z',
     },
@@ -341,6 +344,7 @@ describe('TicketDetailPage', () => {
           id: 'r2',
           senderType: 'agent' as const,
           body: (body as { body: string }).body,
+          bodyHtml: null,
           author: { id: 'agent-1', name: 'Alice Agent' },
           createdAt: '2026-02-20T12:00:00.000Z',
         }

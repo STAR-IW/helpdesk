@@ -20,6 +20,7 @@ export interface TicketMessage {
   fromName: string | null
   toEmail: string
   body: string
+  bodyHtml: string | null
   createdAt: string
 }
 

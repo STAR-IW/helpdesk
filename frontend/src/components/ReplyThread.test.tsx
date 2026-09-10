@@ -8,6 +8,7 @@ const baseReply: Reply = {
   id: 'reply-1',
   senderType: 'agent',
   body: 'Thanks for reaching out, we are looking into it.',
+  bodyHtml: null,
   author: { id: 'agent-1', name: 'Alice Agent' },
   createdAt: '2026-01-15T10:00:00.000Z',
 }
@@ -58,6 +59,7 @@ describe('ReplyThread', () => {
       id: 'reply-2',
       senderType: 'customer',
       body: 'Any update?',
+      bodyHtml: null,
       author: null,
       createdAt: '2026-01-16T09:00:00.000Z',
     }
@@ -74,5 +76,28 @@ describe('ReplyThread', () => {
     expect(bodies).toHaveLength(2)
     expect(bodies[0]).toHaveTextContent(baseReply.body)
     expect(bodies[1]).toHaveTextContent(secondReply.body)
+  })
+
+  it('renders sanitized bodyHtml when present, stripping unsafe content', () => {
+    const reply: Reply = {
+      ...baseReply,
+      bodyHtml: '<p>Hello <strong>world</strong></p><img src=x onerror="alert(1)"><script>alert(1)</script>',
+    }
+
+    renderWithProviders(
+      <ReplyThread replies={[reply]} requesterName="Rae Requester" requesterEmail="requester@test.com" />
+    )
+
+    expect(screen.getByText('world').tagName).toBe('STRONG')
+    expect(document.querySelector('script')).not.toBeInTheDocument()
+    expect(document.querySelector('img')?.getAttribute('onerror')).toBeNull()
+  })
+
+  it('falls back to plain text body when bodyHtml is null', () => {
+    renderWithProviders(
+      <ReplyThread replies={[baseReply]} requesterName="Rae Requester" requesterEmail="requester@test.com" />
+    )
+
+    expect(screen.getByText(baseReply.body).tagName).toBe('P')
   })
 })

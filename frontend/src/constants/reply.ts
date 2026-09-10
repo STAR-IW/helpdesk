@@ -5,6 +5,7 @@ export interface Reply {
   id: string
   senderType: SenderType
   body: string
+  bodyHtml: string | null
   author: Agent | null
   createdAt: string
 }
