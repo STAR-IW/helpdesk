@@ -4,7 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Routes, Route } from 'react-router'
 import { TicketDetailPage } from './TicketDetailPage'
-import { apiGet, apiPatch, ApiError } from '@/lib/api'
+import { apiGet, apiPatch, apiPost, ApiError } from '@/lib/api'
 import { useSession } from '@/lib/auth-client'
 import type { TicketCategory } from '@/lib/ticket-category'
 
@@ -18,6 +18,7 @@ vi.mock('@/lib/api', async () => {
     ...actual,
     apiGet: vi.fn(),
     apiPatch: vi.fn(),
+    apiPost: vi.fn(),
   }
 })
 
@@ -27,6 +28,7 @@ vi.mock('@/lib/auth-client', () => ({
 
 const mockedApiGet = vi.mocked(apiGet)
 const mockedApiPatch = vi.mocked(apiPatch)
+const mockedApiPost = vi.mocked(apiPost)
 const mockedUseSession = vi.mocked(useSession)
 
 const ticket = {
@@ -55,6 +57,15 @@ const ticket = {
       toEmail: 'bob@example.com',
       body: "We're looking into it.",
       createdAt: '2026-02-20T10:00:00.000Z',
+    },
+  ],
+  replies: [
+    {
+      id: 'r1',
+      senderType: 'agent' as const,
+      body: 'Thanks for reaching out, refund is on the way.',
+      author: { id: 'agent-3', name: 'Priya Support' },
+      createdAt: '2026-02-20T11:00:00.000Z',
     },
   ],
 }
@@ -87,6 +98,7 @@ function renderPage(id = '1') {
 beforeEach(() => {
   mockedApiGet.mockReset()
   mockedApiPatch.mockReset()
+  mockedApiPost.mockReset()
   mockSession('agent')
 })
 
@@ -119,6 +131,12 @@ describe('TicketDetailPage', () => {
     expect(messageBodies[1]).toHaveTextContent("We're looking into it.")
     expect(screen.getByText('Bob → support@example.com')).toBeInTheDocument()
     expect(screen.getByText('support@example.com → bob@example.com')).toBeInTheDocument()
+
+    expect(
+      screen.getByText('Thanks for reaching out, refund is on the way.')
+    ).toBeInTheDocument()
+    expect(screen.getByText('Priya Support', { exact: false })).toBeInTheDocument()
+    expect(screen.getByText('(Agent)')).toBeInTheDocument()
   })
 
   it('shows "Uncategorized" when the ticket has no category', async () => {
@@ -303,6 +321,73 @@ describe('TicketDetailPage', () => {
       await user.click(await screen.findByRole('option', { name: 'Closed' }))
 
       expect(await screen.findByText('Invalid status')).toBeInTheDocument()
+    })
+  })
+
+  describe('replies', () => {
+    it('shows an empty state when the ticket has no replies', async () => {
+      mockedApiGet.mockResolvedValue({ ticket: { ...ticket, replies: [] } })
+
+      renderPage()
+
+      expect(await screen.findByText('No replies yet.')).toBeInTheDocument()
+    })
+
+    it('submits a new reply and shows it once the ticket refetches', async () => {
+      let currentTicket = ticket
+      mockedApiGet.mockImplementation(() => Promise.resolve({ ticket: currentTicket }))
+      mockedApiPost.mockImplementation(async (_path, body) => {
+        const newReply = {
+          id: 'r2',
+          senderType: 'agent' as const,
+          body: (body as { body: string }).body,
+          author: { id: 'agent-1', name: 'Alice Agent' },
+          createdAt: '2026-02-20T12:00:00.000Z',
+        }
+        currentTicket = { ...currentTicket, replies: [...currentTicket.replies, newReply] }
+        return { reply: newReply }
+      })
+      const user = userEvent.setup()
+
+      renderPage()
+
+      await screen.findByText('Refund please', { selector: '[data-slot="card-title"]' })
+      const textbox = screen.getByRole('textbox', { name: /reply message/i })
+      await user.type(textbox, 'Sending your refund now.')
+      await user.click(screen.getByRole('button', { name: /send reply/i }))
+
+      expect(mockedApiPost).toHaveBeenCalledWith('/api/tickets/1/replies', {
+        body: 'Sending your refund now.',
+      })
+      expect(await screen.findByText('Sending your refund now.')).toBeInTheDocument()
+      await waitFor(() => expect(textbox).toHaveValue(''))
+    })
+
+    it('shows a validation error when submitting an empty reply', async () => {
+      mockedApiGet.mockResolvedValue({ ticket })
+      const user = userEvent.setup()
+
+      renderPage()
+
+      await screen.findByText('Refund please', { selector: '[data-slot="card-title"]' })
+      await user.click(screen.getByRole('button', { name: /send reply/i }))
+
+      expect(await screen.findByText('Reply cannot be empty')).toBeInTheDocument()
+      expect(mockedApiPost).not.toHaveBeenCalled()
+    })
+
+    it('shows an error when sending a reply fails', async () => {
+      mockedApiGet.mockResolvedValue({ ticket })
+      mockedApiPost.mockRejectedValue(new ApiError(500, 'Failed to send reply'))
+      const user = userEvent.setup()
+
+      renderPage()
+
+      await screen.findByText('Refund please', { selector: '[data-slot="card-title"]' })
+      await user.type(screen.getByRole('textbox', { name: /reply message/i }), 'Hello')
+      await user.click(screen.getByRole('button', { name: /send reply/i }))
+
+      expect(await screen.findByText('Failed to send reply')).toBeInTheDocument()
     })
   })
 })

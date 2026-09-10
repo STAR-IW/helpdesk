@@ -32,6 +32,7 @@ model User {
   role Role @default(agent)
 
   assignedTickets Ticket[]
+  replies         Reply[]
 
   @@map("user")
 }
@@ -106,6 +107,11 @@ enum TicketCategory {
   refundRequest
 }
 
+enum SenderType {
+  agent
+  customer
+}
+
 model Ticket {
   id              String          @id @default(cuid())
   subject         String
@@ -118,6 +124,7 @@ model Ticket {
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   messages        Message[]
+  replies         Reply[]
 
   @@index([requesterEmail])
   @@index([status])
@@ -125,6 +132,20 @@ model Ticket {
   @@index([createdAt])
   @@index([assignedAgentId])
   @@map("ticket")
+}
+
+model Reply {
+  id         String     @id @default(cuid())
+  ticketId   String
+  ticket     Ticket     @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  senderType SenderType
+  authorId   String?
+  author     User?      @relation(fields: [authorId], references: [id])
+  body       String
+  createdAt  DateTime   @default(now())
+
+  @@index([ticketId])
+  @@map("reply")
 }
 
 model Message {

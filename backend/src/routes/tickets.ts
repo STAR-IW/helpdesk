@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../db.js';
 import { requireAuth } from '../middleware/require-auth.js';
-import { TicketStatus, TicketCategory, Role } from '../generated/prisma/enums.js';
+import { TicketStatus, TicketCategory, Role, SenderType } from '../generated/prisma/enums.js';
 import { Prisma } from '../generated/prisma/client.js';
 
 export const ticketsRouter = Router();
@@ -91,6 +91,16 @@ ticketsRouter.get<{ id: string }>('/:id', requireAuth, async (req, res) => {
         },
         orderBy: { createdAt: 'asc' },
       },
+      replies: {
+        select: {
+          id: true,
+          senderType: true,
+          body: true,
+          author: { select: { id: true, name: true } },
+          createdAt: true,
+        },
+        orderBy: { createdAt: 'asc' },
+      },
     },
   });
 
@@ -100,6 +110,43 @@ ticketsRouter.get<{ id: string }>('/:id', requireAuth, async (req, res) => {
   }
 
   res.json({ ticket });
+});
+
+const createReplySchema = z.object({
+  body: z.string().trim().min(1, 'Reply body is required'),
+});
+
+ticketsRouter.post<{ id: string }>('/:id/replies', requireAuth, async (req, res) => {
+  const parsed = createReplySchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0].message });
+    return;
+  }
+  const { id } = req.params;
+
+  const ticket = await prisma.ticket.findUnique({ where: { id }, select: { id: true } });
+  if (!ticket) {
+    res.status(404).json({ error: 'Ticket not found' });
+    return;
+  }
+
+  const reply = await prisma.reply.create({
+    data: {
+      ticketId: id,
+      senderType: SenderType.agent,
+      authorId: req.user!.id,
+      body: parsed.data.body,
+    },
+    select: {
+      id: true,
+      senderType: true,
+      body: true,
+      author: { select: { id: true, name: true } },
+      createdAt: true,
+    },
+  });
+
+  res.status(201).json({ reply });
 });
 
 const updateTicketSchema = z
