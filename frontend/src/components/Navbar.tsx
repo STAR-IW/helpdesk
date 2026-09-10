@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router'
 import { authClient, useSession } from '../lib/auth-client'
 import { Button } from '@/components/ui/button'
-import { Role } from '@/lib/api'
+import { Role } from '@/constants/role'
 
 export function Navbar() {
   const navigate = useNavigate()

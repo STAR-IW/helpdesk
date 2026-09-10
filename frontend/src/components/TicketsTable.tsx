@@ -31,19 +31,9 @@ import {
 } from '@/components/ui/table'
 import { apiGet, ApiError } from '@/lib/api'
 import { cn } from '@/lib/utils'
-import { STATUS_LABELS, STATUS_VARIANTS, type TicketStatus } from '@/lib/ticket-status'
-import { CATEGORY_LABELS, type TicketCategory } from '@/lib/ticket-category'
-
-type Ticket = {
-  id: string
-  subject: string
-  status: TicketStatus
-  category: TicketCategory | null
-  requesterEmail: string
-  requesterName: string | null
-  createdAt: string
-  updatedAt: string
-}
+import { STATUS_LABELS, STATUS_VARIANTS, type TicketStatus } from '@/constants/ticket-status'
+import { CATEGORY_LABELS, type TicketCategory } from '@/constants/ticket-category'
+import type { Ticket } from '@/constants/ticket'
 
 const PAGE_SIZE = 10
 

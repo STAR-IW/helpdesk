@@ -1,12 +1,5 @@
 const API_URL = import.meta.env.VITE_API_URL
 
-export const Role = {
-  admin: 'admin',
-  agent: 'agent',
-} as const
-
-export type Role = (typeof Role)[keyof typeof Role]
-
 export class ApiError extends Error {
   status: number
 

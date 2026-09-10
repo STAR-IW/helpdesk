@@ -6,7 +6,7 @@ import { MemoryRouter, Routes, Route } from 'react-router'
 import { TicketDetailPage } from './TicketDetailPage'
 import { apiGet, apiPatch, apiPost, ApiError } from '@/lib/api'
 import { useSession } from '@/lib/auth-client'
-import type { TicketCategory } from '@/lib/ticket-category'
+import type { TicketCategory } from '@/constants/ticket-category'
 
 vi.mock('@/components/Navbar', () => ({
   Navbar: () => null,

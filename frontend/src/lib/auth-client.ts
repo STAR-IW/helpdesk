@@ -1,6 +1,7 @@
 import { createAuthClient } from 'better-auth/react'
 import { inferAdditionalFields } from 'better-auth/client/plugins'
 
+// Create the better-auth client instance for talking to the backend's auth endpoints.
 export const authClient = createAuthClient({
   baseURL: import.meta.env.VITE_API_URL,
   plugins: [

@@ -1,5 +1,5 @@
 import { createBrowserRouter } from 'react-router'
-import { Role } from './lib/api'
+import { Role } from './constants/role'
 import { LoginPage } from './pages/LoginPage'
 import { HomePage } from './pages/HomePage'
 import { TicketsPage } from './pages/TicketsPage'

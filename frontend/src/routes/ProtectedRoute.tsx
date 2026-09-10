@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react'
 import { Navigate } from 'react-router'
 import { useSession } from '../lib/auth-client'
-import type { Role } from '@/lib/api'
+import type { Role } from '@/constants/role'
 
 export function ProtectedRoute({
   children,

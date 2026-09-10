@@ -13,7 +13,8 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { apiDelete, ApiError, Role } from '@/lib/api'
+import { apiDelete, ApiError } from '@/lib/api'
+import { Role } from '@/constants/role'
 
 type DeletableUser = {
   id: string

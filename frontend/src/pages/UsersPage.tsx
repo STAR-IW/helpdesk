@@ -15,7 +15,8 @@ import {
   TableHead,
   TableCell,
 } from '@/components/ui/table'
-import { apiGet, ApiError, Role } from '@/lib/api'
+import { apiGet, ApiError } from '@/lib/api'
+import { Role } from '@/constants/role'
 
 type User = {
   id: string

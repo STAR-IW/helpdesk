@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { apiPost, ApiError } from '@/lib/api'
-import type { Reply } from '@/components/ReplyThread'
+import type { Reply } from '@/constants/reply'
 
 const replySchema = z.object({
   body: z.string().trim().min(1, 'Reply cannot be empty'),

@@ -1,13 +1,5 @@
-import { SENDER_TYPE_LABELS, type SenderType } from '@/lib/reply-sender-type'
-import type { Agent } from '@/components/TicketDetails'
-
-export type Reply = {
-  id: string
-  senderType: SenderType
-  body: string
-  author: Agent | null
-  createdAt: string
-}
+import { SENDER_TYPE_LABELS } from '@/constants/reply-sender-type'
+import type { Reply } from '@/constants/reply'
 
 type ReplyThreadProps = {
   replies: Reply[]

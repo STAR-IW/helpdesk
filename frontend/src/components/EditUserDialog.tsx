@@ -17,7 +17,8 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { apiPatch, ApiError, type Role } from '@/lib/api'
+import { apiPatch, ApiError } from '@/lib/api'
+import type { Role } from '@/constants/role'
 
 const editUserSchema = z.object({
   name: z

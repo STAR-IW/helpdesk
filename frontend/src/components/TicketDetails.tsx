@@ -9,40 +9,13 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { apiPatch, ApiError } from '@/lib/api'
-import { STATUS_LABELS, type TicketStatus } from '@/lib/ticket-status'
-import { CATEGORY_LABELS, type TicketCategory } from '@/lib/ticket-category'
-import type { Reply } from '@/components/ReplyThread'
+import { STATUS_LABELS, type TicketStatus } from '@/constants/ticket-status'
+import { CATEGORY_LABELS, type TicketCategory } from '@/constants/ticket-category'
+import type { TicketDetail } from '@/constants/ticket'
+import type { Agent } from '@/constants/agent'
 
 const UNASSIGNED = 'unassigned'
 const UNCATEGORIZED = 'uncategorized'
-
-type Message = {
-  id: string
-  fromEmail: string
-  fromName: string | null
-  toEmail: string
-  body: string
-  createdAt: string
-}
-
-export type Agent = {
-  id: string
-  name: string
-}
-
-export type TicketDetail = {
-  id: string
-  subject: string
-  status: TicketStatus
-  category: TicketCategory | null
-  requesterEmail: string
-  requesterName: string | null
-  assignedAgent: Agent | null
-  createdAt: string
-  updatedAt: string
-  messages: Message[]
-  replies: Reply[]
-}
 
 type TicketDetailsProps = {
   ticket: TicketDetail

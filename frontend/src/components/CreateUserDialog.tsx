@@ -16,7 +16,8 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { apiPost, ApiError, type Role } from '@/lib/api'
+import { apiPost, ApiError } from '@/lib/api'
+import type { Role } from '@/constants/role'
 
 const createUserSchema = z.object({
   name: z
