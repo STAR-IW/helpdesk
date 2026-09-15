@@ -42,7 +42,7 @@ Vitest + React Testing Library, `jsdom` environment (configured in `frontend/vit
 ## Architecture notes
 
 - Auth uses database-backed sessions (session id in an HTTP-only cookie, session record in Postgres) — not JWT. This is intentional, to allow server-side session revocation.
-- AI features (ticket classification, auto-response, summaries, suggested replies) call the Anthropic API server-side only, from the backend — never from the frontend.
+- AI features (ticket classification, auto-response, summaries, suggested replies, reply polish) go through the Vercel AI SDK (`ai` + a provider package, e.g. `@ai-sdk/google`), called server-side only from the backend — never from the frontend. The model/provider is chosen in one place (`backend/src/ai/client.ts`, currently Gemini's `gemini-3.5-flash`) so it can be swapped later without touching call sites; add new AI features under `backend/src/ai/` following the same pattern (e.g. `polish-reply.ts`).
 - Frontend and backend are separate processes/origins; backend has `cors()` enabled for local cross-origin requests.
 - Frontend UI components use shadcn/ui (`base-nova` style, `neutral` base color, Base UI primitives, Tailwind v4 CSS-based theming — no `tailwind.config.js`). Config lives in `frontend/components.json`; theme tokens/colors are in `frontend/src/index.css`.
 - `@/*` resolves to `frontend/src/*` (path alias set in `tsconfig.json`, `tsconfig.app.json`, and `vite.config.ts`).

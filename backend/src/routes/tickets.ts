@@ -4,6 +4,7 @@ import { prisma } from '../db.js';
 import { requireAuth } from '../middleware/require-auth.js';
 import { TicketStatus, TicketCategory, Role, SenderType } from '../generated/prisma/enums.js';
 import { Prisma } from '../generated/prisma/client.js';
+import { polishReply } from '../ai/polish-reply.js';
 
 export const ticketsRouter = Router();
 
@@ -150,6 +151,38 @@ ticketsRouter.post<{ id: string }>('/:id/replies', requireAuth, async (req, res)
   });
 
   res.status(201).json({ reply });
+});
+
+const polishReplySchema = z.object({
+  body: z.string().trim().min(1, 'Reply body is required').max(1500),
+});
+
+ticketsRouter.post<{ id: string }>('/:id/replies/polish', requireAuth, async (req, res) => {
+  const parsed = polishReplySchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.issues[0].message });
+    return;
+  }
+  const { id } = req.params;
+
+  // Get context from DB to ground the polish prompt (ticket subject, customer name)
+    const ticket = await prisma.ticket.findUnique({
+    where: { id },
+    select: { subject: true, requesterName: true },
+  });
+  if (!ticket) {
+    res.status(404).json({ error: 'Ticket not found' });
+    return;
+  }
+  const customerFirstName = ticket.requesterName?.trim().split(/\s+/)[0] ?? null;
+
+  try {
+    const text = await polishReply(parsed.data.body, ticket.subject, req.user!.name, customerFirstName);
+    res.json({ text });
+  } catch (err) {
+    console.error(err);
+    res.status(502).json({ error: 'Failed to polish reply' });
+  }
 });
 
 const updateTicketSchema = z

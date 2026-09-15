@@ -8,6 +8,7 @@ const envSchema = z.object({
   BETTER_AUTH_URL: z.url('BETTER_AUTH_URL must be a valid URL'),
   FRONTEND_URL: z.url('FRONTEND_URL must be a valid URL'),
   INBOUND_EMAIL_WEBHOOK_SECRET: z.string().min(1, 'INBOUND_EMAIL_WEBHOOK_SECRET is required'),
+  GOOGLE_GENERATIVE_AI_API_KEY: z.string().min(1, 'GOOGLE_GENERATIVE_AI_API_KEY is required'),
   PORT: z.coerce.number().int().positive().optional(),
 });
 

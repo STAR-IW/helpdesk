@@ -367,16 +367,13 @@ describe('TicketDetailPage', () => {
       await waitFor(() => expect(textbox).toHaveValue(''))
     })
 
-    it('shows a validation error when submitting an empty reply', async () => {
+    it('disables Send reply while the reply box is empty', async () => {
       mockedApiGet.mockResolvedValue({ ticket })
-      const user = userEvent.setup()
 
       renderPage()
 
       await screen.findByText('Refund please', { selector: '[data-slot="card-title"]' })
-      await user.click(screen.getByRole('button', { name: /send reply/i }))
-
-      expect(await screen.findByText('Reply cannot be empty')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /send reply/i })).toBeDisabled()
       expect(mockedApiPost).not.toHaveBeenCalled()
     })
 

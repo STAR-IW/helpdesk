@@ -22,7 +22,11 @@ Inbound email webhook (Postmark Inbound / SendGrid Inbound Parse / Mailgun Route
 - Avoids running an IMAP poller
 
 ## AI
-Anthropic API (Claude)
+Vercel AI SDK (`ai` + `@ai-sdk/google`), called server-side only from `/backend`.
+- Currently configured against Gemini (`gemini-3.5-flash`) — the AI SDK's unified provider
+  interface was chosen specifically so the underlying model/provider (e.g. Anthropic, OpenAI)
+  can be swapped later by changing the provider in `backend/src/ai/client.ts`, without
+  rewriting call sites.
 - Ticket classification (structured output into: general question, technical question, refund request)
 - Auto-response generation from knowledge base
 - Ticket summaries
