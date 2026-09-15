@@ -166,7 +166,7 @@ ticketsRouter.post<{ id: string }>('/:id/replies/polish', requireAuth, async (re
   const { id } = req.params;
 
   // Get context from DB to ground the polish prompt (ticket subject, customer name)
-    const ticket = await prisma.ticket.findUnique({
+  const ticket = await prisma.ticket.findUnique({
     where: { id },
     select: { subject: true, requesterName: true },
   });
