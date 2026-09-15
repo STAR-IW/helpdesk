@@ -5,6 +5,7 @@ import { requireAuth } from '../middleware/require-auth.js';
 import { TicketStatus, TicketCategory, Role, SenderType } from '../generated/prisma/enums.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { polishReply } from '../ai/polish-reply.js';
+import { summarizeTicket } from '../ai/summarize-ticket.js';
 
 export const ticketsRouter = Router();
 
@@ -151,6 +152,62 @@ ticketsRouter.post<{ id: string }>('/:id/replies', requireAuth, async (req, res)
   });
 
   res.status(201).json({ reply });
+});
+
+ticketsRouter.post<{ id: string }>('/:id/summary', requireAuth, async (req, res) => {
+  const { id } = req.params;
+
+  const ticket = await prisma.ticket.findUnique({
+    where: { id },
+    select: {
+      subject: true,
+      requesterName: true,
+      requesterEmail: true,
+      messages: {
+        select: { fromName: true, fromEmail: true, body: true, createdAt: true },
+        orderBy: { createdAt: 'asc' },
+      },
+      replies: {
+        select: {
+          body: true,
+          createdAt: true,
+          senderType: true,
+          author: { select: { name: true } },
+        },
+        orderBy: { createdAt: 'asc' },
+      },
+    },
+  });
+  if (!ticket) {
+    res.status(404).json({ error: 'Ticket not found' });
+    return;
+  }
+
+  const entries = [
+    ...ticket.messages.map((message) => ({
+      from: message.fromName ?? message.fromEmail,
+      body: message.body,
+      createdAt: message.createdAt,
+    })),
+    ...ticket.replies.map((reply) => ({
+      from: reply.author?.name ?? (reply.senderType === SenderType.agent ? 'Agent' : 'Customer'),
+      body: reply.body,
+      createdAt: reply.createdAt,
+    })),
+  ].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+
+  if (entries.length === 0) {
+    res.status(400).json({ error: 'Ticket has no messages to summarize' });
+    return;
+  }
+
+  try {
+    const summary = await summarizeTicket(ticket.subject, entries);
+    res.json({ summary });
+  } catch (err) {
+    console.error(err);
+    res.status(502).json({ error: 'Failed to summarize ticket' });
+  }
 });
 
 const polishReplySchema = z.object({

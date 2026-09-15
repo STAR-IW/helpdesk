@@ -14,6 +14,7 @@ import { STATUS_LABELS, type TicketStatus } from '@/constants/ticket-status'
 import { CATEGORY_LABELS, type TicketCategory } from '@/constants/ticket-category'
 import type { TicketDetail } from '@/constants/ticket'
 import type { Agent } from '@/constants/agent'
+import { TicketSummary } from '@/components/TicketSummary'
 
 const UNASSIGNED = 'unassigned'
 const UNCATEGORIZED = 'uncategorized'
@@ -104,6 +105,7 @@ export function TicketDetails({ ticket, isAdmin, agents, children }: TicketDetai
             )}
           </CardContent>
         </Card>
+        <TicketSummary ticketId={ticket.id} />
         {children}
       </div>
       <div className="space-y-4">
