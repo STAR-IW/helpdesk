@@ -2,10 +2,10 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../db.js';
 import { requireWebhookSecret } from '../middleware/require-webhook-secret.js';
-import { Prisma, type Ticket, type Message } from '../generated/prisma/client.js';
+import { Prisma } from '../generated/prisma/client.js';
 import { TicketStatus } from '../generated/prisma/enums.js';
 import { sanitizeHtml } from '../sanitize.js';
-import { classifyTicket } from '../ai/classify-ticket.js';
+import { classifyTicketInBackground } from '../jobs/classify-ticket-job.js';
 
 export const inboundEmailRouter = Router();
 
@@ -31,16 +31,6 @@ function normalizeSubject(subject: string): string {
     normalized = normalized.replace(/^(re|fwd?):\s*/i, '');
   } while (normalized !== previous);
   return normalized.toLowerCase();
-}
-
-// Fires the classification call and writes the result once it resolves, without
-// making the webhook response wait on the AI call.
-function classifyTicketInBackground(ticket: Ticket, message: Message): void {
-  classifyTicket(ticket.subject, message.body)
-    .then((category) => prisma.ticket.update({ where: { id: ticket.id }, data: { category } }))
-    .catch((err) => {
-      console.error(`Failed to classify ticket ${ticket.id}`, err);
-    });
 }
 
 inboundEmailRouter.post('/', requireWebhookSecret, async (req, res) => {

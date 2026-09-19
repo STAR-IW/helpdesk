@@ -2,8 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 import { prisma } from '../db.js';
-import { classifyTicket } from '../ai/classify-ticket.js';
-import { TicketCategory } from '../generated/prisma/enums.js';
+import { classifyTicketInBackground } from '../jobs/classify-ticket-job.js';
 
 vi.mock('../db.js', () => ({
   prisma: {
@@ -11,8 +10,8 @@ vi.mock('../db.js', () => ({
   },
 }));
 
-vi.mock('../ai/classify-ticket.js', () => ({
-  classifyTicket: vi.fn(),
+vi.mock('../jobs/classify-ticket-job.js', () => ({
+  classifyTicketInBackground: vi.fn(),
 }));
 
 vi.mock('../middleware/require-webhook-secret.js', () => ({
@@ -22,7 +21,7 @@ vi.mock('../middleware/require-webhook-secret.js', () => ({
 const mockedFindMany = vi.mocked(prisma.ticket.findMany);
 const mockedCreate = vi.mocked(prisma.ticket.create);
 const mockedUpdate = vi.mocked(prisma.ticket.update);
-const mockedClassifyTicket = vi.mocked(classifyTicket);
+const mockedClassifyTicketInBackground = vi.mocked(classifyTicketInBackground);
 
 async function buildApp() {
   const { inboundEmailRouter } = await import('./inbound-email.js');
@@ -44,42 +43,27 @@ beforeEach(() => {
   mockedFindMany.mockReset();
   mockedCreate.mockReset();
   mockedUpdate.mockReset();
-  mockedClassifyTicket.mockReset();
+  mockedClassifyTicketInBackground.mockReset();
 });
 
 describe('POST /api/inbound-email', () => {
-  it('responds before the classification call resolves, then writes the category once it does', async () => {
+  it('queues classification for a newly created ticket with its first message', async () => {
     mockedFindMany.mockResolvedValue([]);
-    mockedCreate.mockResolvedValue({
+    const createdTicket = {
       id: 'ticket-1',
       subject: 'Refund request',
       messages: [{ body: 'I want my money back' }],
-    } as never);
-    let resolveClassification: (category: TicketCategory) => void;
-    mockedClassifyTicket.mockReturnValue(
-      new Promise((resolve) => {
-        resolveClassification = resolve;
-      })
-    );
-    mockedUpdate.mockResolvedValue({} as never);
+    };
+    mockedCreate.mockResolvedValue(createdTicket as never);
     const app = await buildApp();
 
     const res = await request(app).post('/api/inbound-email').send(payload);
 
     expect(res.status).toBe(201);
-    expect(mockedClassifyTicket).toHaveBeenCalledWith('Refund request', 'I want my money back');
-    expect(mockedUpdate).not.toHaveBeenCalled();
-
-    resolveClassification!(TicketCategory.refundRequest);
-    await new Promise((resolve) => setImmediate(resolve));
-
-    expect(mockedUpdate).toHaveBeenCalledWith({
-      where: { id: 'ticket-1' },
-      data: { category: TicketCategory.refundRequest },
-    });
+    expect(mockedClassifyTicketInBackground).toHaveBeenCalledWith(createdTicket, createdTicket.messages[0]);
   });
 
-  it('does not classify when the message is appended to an existing open ticket', async () => {
+  it('does not queue classification when the message is appended to an existing open ticket', async () => {
     mockedFindMany.mockResolvedValue([{ id: 'ticket-1', subject: 'Refund request' }] as never);
     mockedUpdate.mockResolvedValueOnce({ id: 'ticket-1', messages: [] } as never);
     const app = await buildApp();
@@ -87,26 +71,6 @@ describe('POST /api/inbound-email', () => {
     const res = await request(app).post('/api/inbound-email').send(payload);
 
     expect(res.status).toBe(201);
-    expect(mockedClassifyTicket).not.toHaveBeenCalled();
-  });
-
-  it('logs and does not crash when classification fails', async () => {
-    mockedFindMany.mockResolvedValue([]);
-    mockedCreate.mockResolvedValue({
-      id: 'ticket-1',
-      subject: 'Refund request',
-      messages: [{ body: 'I want my money back' }],
-    } as never);
-    mockedClassifyTicket.mockRejectedValue(new Error('upstream failure'));
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const app = await buildApp();
-
-    const res = await request(app).post('/api/inbound-email').send(payload);
-    await new Promise((resolve) => setImmediate(resolve));
-
-    expect(res.status).toBe(201);
-    expect(mockedUpdate).not.toHaveBeenCalled();
-    expect(consoleError).toHaveBeenCalledWith('Failed to classify ticket ticket-1', expect.any(Error));
-    consoleError.mockRestore();
+    expect(mockedClassifyTicketInBackground).not.toHaveBeenCalled();
   });
 });
