@@ -5,7 +5,7 @@ import { requireWebhookSecret } from '../middleware/require-webhook-secret.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { TicketStatus } from '../generated/prisma/enums.js';
 import { sanitizeHtml } from '../sanitize.js';
-import { classifyTicketInBackground } from '../jobs/classify-ticket-job.js';
+import { processTicketInBackground, followUpTicketInBackground } from '../jobs/process-ticket-job.js';
 
 export const inboundEmailRouter = Router();
 
@@ -72,7 +72,9 @@ inboundEmailRouter.post('/', requireWebhookSecret, async (req, res) => {
         });
 
     if (!existingTicket) {
-      classifyTicketInBackground(ticket, ticket.messages[0]);
+      processTicketInBackground(ticket, ticket.messages[0]);
+    } else if (existingTicket.status === TicketStatus.resolved) {
+      followUpTicketInBackground(ticket.id, text);
     }
 
     res.status(201).json({ ticket });

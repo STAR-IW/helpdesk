@@ -9,10 +9,15 @@ import { summarizeTicket } from '../ai/summarize-ticket.js';
 
 export const ticketsRouter = Router();
 
+// Tickets in new/processing are still being handled by the AI pipeline: they're hidden
+// from the list and can't be set manually.
+const HIDDEN_STATUSES = [TicketStatus.new, TicketStatus.processing];
+const visibleStatusSchema = z.enum([TicketStatus.open, TicketStatus.resolved, TicketStatus.closed]);
+
 const listTicketsQuerySchema = z.object({
   sortBy: z.enum(['subject', 'requesterName', 'status', 'category', 'createdAt']).default('createdAt'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
-  status: z.enum(TicketStatus).optional(),
+  status: visibleStatusSchema.optional(),
   category: z.enum(TicketCategory).optional(),
   search: z.string().trim().min(1).optional(),
   page: z.coerce.number().int().min(1).default(1),
@@ -33,7 +38,7 @@ ticketsRouter.get('/', requireAuth, async (req, res) => {
       : { [sortBy]: sortOrder };
 
   const where = {
-    ...(status && { status }),
+    status: status ?? { notIn: HIDDEN_STATUSES },
     ...(category && { category }),
     ...(search && {
       OR: [
@@ -154,6 +159,12 @@ ticketsRouter.post<{ id: string }>('/:id/replies', requireAuth, async (req, res)
   res.status(201).json({ reply });
 });
 
+const REPLY_SENDER_NAMES: Record<SenderType, string> = {
+  [SenderType.agent]: 'Agent',
+  [SenderType.customer]: 'Customer',
+  [SenderType.ai]: 'AI Assistant',
+};
+
 ticketsRouter.post<{ id: string }>('/:id/summary', requireAuth, async (req, res) => {
   const { id } = req.params;
 
@@ -190,7 +201,7 @@ ticketsRouter.post<{ id: string }>('/:id/summary', requireAuth, async (req, res)
       createdAt: message.createdAt,
     })),
     ...ticket.replies.map((reply) => ({
-      from: reply.author?.name ?? (reply.senderType === SenderType.agent ? 'Agent' : 'Customer'),
+      from: reply.author?.name ?? REPLY_SENDER_NAMES[reply.senderType],
       body: reply.body,
       createdAt: reply.createdAt,
     })),
@@ -244,7 +255,7 @@ ticketsRouter.post<{ id: string }>('/:id/replies/polish', requireAuth, async (re
 
 const updateTicketSchema = z
   .object({
-    status: z.enum(TicketStatus).optional(),
+    status: visibleStatusSchema.optional(),
     category: z.enum(TicketCategory).nullable().optional(),
     agentId: z.string().min(1).nullable().optional(),
   })

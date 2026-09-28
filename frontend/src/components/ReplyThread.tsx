@@ -19,7 +19,8 @@ export function ReplyThread({ replies, requesterName, requesterEmail }: ReplyThr
         <div key={reply.id} className="rounded-lg border border-border p-3">
           <div className="mb-1 flex items-center justify-between text-sm">
             <span className="font-medium">
-              {reply.author?.name ?? requesterName ?? requesterEmail}{' '}
+              {reply.author?.name ??
+                (reply.senderType === 'ai' ? 'Support Team' : (requesterName ?? requesterEmail))}{' '}
               <span className="font-normal text-muted-foreground">
                 ({SENDER_TYPE_LABELS[reply.senderType]})
               </span>

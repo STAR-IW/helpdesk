@@ -7,13 +7,13 @@ import { usersRouter } from './routes/users.js';
 import { inboundEmailRouter } from './routes/inbound-email.js';
 import { ticketsRouter } from './routes/tickets.js';
 import { boss } from './jobs/boss.js';
-import { registerClassifyTicketWorker } from './jobs/classify-ticket-job.js';
+import { registerTicketWorkers } from './jobs/process-ticket-job.js';
 
 const app = express();
 const port = env.PORT ?? 3000;
 
 await boss.start();
-await registerClassifyTicketWorker();
+await registerTicketWorkers();
 
 app.use(cors({ origin: env.FRONTEND_URL, credentials: true }));
 

@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/select'
 import { apiPatch, ApiError } from '@/lib/api'
 import { sanitizeHtml } from '@/lib/sanitize'
-import { STATUS_LABELS, type TicketStatus } from '@/constants/ticket-status'
+import { SELECTABLE_STATUSES, STATUS_LABELS, type TicketStatus } from '@/constants/ticket-status'
 import { CATEGORY_LABELS, type TicketCategory } from '@/constants/ticket-category'
 import type { TicketDetail } from '@/constants/ticket'
 import type { Agent } from '@/constants/agent'
@@ -128,9 +128,9 @@ export function TicketDetails({ ticket, isAdmin, agents, children }: TicketDetai
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(STATUS_LABELS).map(([value, label]) => (
-                    <SelectItem key={value} value={value}>
-                      {label}
+                  {SELECTABLE_STATUSES.map((status) => (
+                    <SelectItem key={status} value={status}>
+                      {STATUS_LABELS[status]}
                     </SelectItem>
                   ))}
                 </SelectContent>

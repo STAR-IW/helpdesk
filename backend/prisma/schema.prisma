@@ -96,6 +96,8 @@ model RateLimit {
 }
 
 enum TicketStatus {
+  new
+  processing
   open
   resolved
   closed
@@ -110,12 +112,13 @@ enum TicketCategory {
 enum SenderType {
   agent
   customer
+  ai
 }
 
 model Ticket {
   id              String          @id @default(cuid())
   subject         String
-  status          TicketStatus    @default(open)
+  status          TicketStatus    @default(new)
   category        TicketCategory?
   requesterEmail  String
   requesterName   String?
