@@ -42,3 +42,33 @@ export async function findTicketsByRequesterEmail(email: string): Promise<Array<
     return result.rows;
   });
 }
+
+const IN_FLIGHT_STATUSES = new Set(['new', 'processing']);
+
+/**
+ * Polls a ticket's status until the pg-boss `process-ticket` background job has moved
+ * it out of new/processing (into open or resolved). A freshly webhook-created ticket
+ * starts as "new" and is asynchronously classified/auto-resolved by that job; tests
+ * that then change status/category/assignment through the UI need to wait for the job
+ * to finish first, otherwise it can race their change and clobber it afterwards.
+ * Returns the settled status. Throws if it hasn't left new/processing within timeoutMs.
+ */
+export async function waitForTicketProcessed(ticketId: string, timeoutMs = 30_000): Promise<string> {
+  return withClient(async (client) => {
+    const start = Date.now();
+    for (;;) {
+      const result = await client.query('SELECT status FROM "ticket" WHERE id = $1', [ticketId]);
+      const status = result.rows[0]?.status as string | undefined;
+      if (status && !IN_FLIGHT_STATUSES.has(status)) {
+        return status;
+      }
+      if (Date.now() - start > timeoutMs) {
+        throw new Error(
+          `Ticket ${ticketId} was still "${status ?? 'unknown'}" after ${timeoutMs}ms — the ` +
+            'process-ticket background job may not have run',
+        );
+      }
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+  });
+}

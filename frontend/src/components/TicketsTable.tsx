@@ -31,7 +31,12 @@ import {
 } from '@/components/ui/table'
 import { apiGet, ApiError } from '@/lib/api'
 import { cn } from '@/lib/utils'
-import { STATUS_LABELS, STATUS_VARIANTS, type TicketStatus } from '@/constants/ticket-status'
+import {
+  SELECTABLE_STATUSES,
+  STATUS_LABELS,
+  STATUS_VARIANTS,
+  type TicketStatus,
+} from '@/constants/ticket-status'
 import { CATEGORY_LABELS, type TicketCategory } from '@/constants/ticket-category'
 import type { Ticket } from '@/constants/ticket'
 
@@ -199,9 +204,9 @@ export function TicketsTable() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All statuses</SelectItem>
-            {Object.entries(STATUS_LABELS).map(([value, label]) => (
-              <SelectItem key={value} value={value}>
-                {label}
+            {SELECTABLE_STATUSES.map((status) => (
+              <SelectItem key={status} value={status}>
+                {STATUS_LABELS[status]}
               </SelectItem>
             ))}
           </SelectContent>

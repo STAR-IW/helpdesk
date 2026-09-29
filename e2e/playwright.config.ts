@@ -37,6 +37,10 @@ export default defineConfig({
         BETTER_AUTH_URL: process.env.BETTER_AUTH_URL!,
         FRONTEND_URL: process.env.FRONTEND_URL!,
         INBOUND_EMAIL_WEBHOOK_SECRET: process.env.INBOUND_EMAIL_WEBHOOK_SECRET!,
+        // Deliberately invalid: overrides the real key from the root .env so e2e runs never
+        // spend Gemini tokens. AI calls fail fast (non-retryable auth error) and the
+        // process-ticket job falls back to leaving tickets open.
+        GOOGLE_GENERATIVE_AI_API_KEY: 'e2e-no-gemini',
       },
       // Dedicated port (not the dev default 3000): guarantees this can never
       // collide with a manually-running dev backend, which reuseExistingServer

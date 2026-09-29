@@ -24,14 +24,21 @@ type FollowUpTicketJobData = {
 
 // Moves a new ticket through the AI pipeline: new -> processing -> classified ->
 // resolved (answered from the knowledge base) or open (handed to an agent).
+// Status changes use updateMany guarded on the expected current status, so they never
+// throw when the ticket was deleted meanwhile, and never overwrite a manual change.
 async function processTicket({ ticketId, subject, body, requesterName }: ProcessTicketJobData): Promise<void> {
   try {
-    await prisma.ticket.update({ where: { id: ticketId }, data: { status: TicketStatus.processing } });
+    const { count } = await prisma.ticket.updateMany({
+      where: { id: ticketId, status: TicketStatus.new },
+      data: { status: TicketStatus.processing },
+    });
+    // Ticket deleted, or already picked up by an earlier attempt/changed by an agent.
+    if (count === 0) return;
 
     let category: TicketCategory | null = null;
     try {
       category = await classifyTicket(subject, body);
-      await prisma.ticket.update({ where: { id: ticketId }, data: { category } });
+      await prisma.ticket.updateMany({ where: { id: ticketId, category: null }, data: { category } });
     } catch (err) {
       console.error(`Failed to classify ticket ${ticketId}`, err);
     }
@@ -39,10 +46,15 @@ async function processTicket({ ticketId, subject, body, requesterName }: Process
     const customerFirstName = requesterName?.trim().split(/\s+/)[0] ?? null;
     const reply = await autoResolveTicket(subject, body, category, customerFirstName);
     if (reply) {
-      await prisma.$transaction([
-        prisma.reply.create({ data: { ticketId, senderType: SenderType.ai, body: reply } }),
-        prisma.ticket.update({ where: { id: ticketId }, data: { status: TicketStatus.resolved } }),
-      ]);
+      await prisma.$transaction(async (tx) => {
+        const resolved = await tx.ticket.updateMany({
+          where: { id: ticketId, status: TicketStatus.processing },
+          data: { status: TicketStatus.resolved },
+        });
+        if (resolved.count === 1) {
+          await tx.reply.create({ data: { ticketId, senderType: SenderType.ai, body: reply } });
+        }
+      });
       return;
     }
   } catch (err) {
@@ -51,7 +63,10 @@ async function processTicket({ ticketId, subject, body, requesterName }: Process
 
   // Anything the AI couldn't (or failed to) resolve goes to the agent queue, so a
   // ticket never stays hidden in new/processing.
-  await prisma.ticket.update({ where: { id: ticketId }, data: { status: TicketStatus.open } });
+  await prisma.ticket.updateMany({
+    where: { id: ticketId, status: { in: [TicketStatus.new, TicketStatus.processing] } },
+    data: { status: TicketStatus.open },
+  });
 }
 
 // Reopens a resolved ticket when the customer's follow-up needs a response. A plain
