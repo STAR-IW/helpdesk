@@ -77,7 +77,7 @@ describe('POST /api/tickets/:id/summary', () => {
     ]);
   });
 
-  it('falls back to a generic label when a reply has no author', async () => {
+  it('labels an authorless AI reply as the AI assistant', async () => {
     mockedFindUnique.mockResolvedValue({
       subject: 'Refund request',
       requesterName: null,
@@ -87,7 +87,7 @@ describe('POST /api/tickets/:id/summary', () => {
         {
           body: 'Thanks for reaching out',
           createdAt: new Date('2026-01-11T00:00:00.000Z'),
-          senderType: 'auto',
+          senderType: 'ai',
           author: null,
         },
       ],
@@ -98,7 +98,7 @@ describe('POST /api/tickets/:id/summary', () => {
     await request(app).post('/api/tickets/ticket-1/summary');
 
     expect(mockedSummarizeTicket).toHaveBeenCalledWith('Refund request', [
-      { from: 'Customer', body: 'Thanks for reaching out', createdAt: new Date('2026-01-11T00:00:00.000Z') },
+      { from: 'AI Assistant', body: 'Thanks for reaching out', createdAt: new Date('2026-01-11T00:00:00.000Z') },
     ]);
   });
 

@@ -210,6 +210,24 @@ describe('TicketsTable', () => {
     expect(lastCallUrl).toContain('status=open')
   })
 
+  it('only offers agent-visible statuses in the status filter', async () => {
+    const user = userEvent.setup()
+    mockedApiGet.mockResolvedValue({ tickets })
+
+    renderWithProviders(<TicketsTable />)
+
+    await screen.findByRole('row', { name: /Refund please/ })
+    await user.click(screen.getByRole('combobox', { name: /filter by status/i }))
+
+    const options = await screen.findAllByRole('option')
+    expect(options.map((option) => option.textContent)).toEqual([
+      'All statuses',
+      'Open',
+      'Resolved',
+      'Closed',
+    ])
+  })
+
   it('filters by category when a category is selected', async () => {
     const user = userEvent.setup()
     mockedApiGet.mockResolvedValue({ tickets })

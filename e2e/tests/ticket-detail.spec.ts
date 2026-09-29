@@ -1,6 +1,6 @@
 import { test, expect, type APIRequestContext, type Page } from '@playwright/test';
 import { AGENT_EMAIL, loginAsAdmin, loginAsAgent } from './helpers/auth.js';
-import { deleteTicket } from './helpers/tickets-db.js';
+import { deleteTicket, waitForTicketProcessed } from './helpers/tickets-db.js';
 
 // Everything about the ticket detail page's own rendering/interaction logic
 // (subject/requester/dates, messages, status/category/assignment selects,
@@ -64,6 +64,13 @@ async function createTicket(
     throw new Error(`Failed to seed ticket: ${response.status()} ${await response.text()}`);
   }
   const body = (await response.json()) as { ticket: { id: string } };
+
+  // A freshly webhook-created ticket starts "new" and is asynchronously classified/
+  // auto-resolved by the process-ticket background job (which may set its status to
+  // "processing" then "open"/"resolved", set its category, and/or add an AI reply).
+  // Wait for that job to finish before the test starts interacting with the ticket,
+  // so its status/category writes can't land after — and clobber — the test's own.
+  await waitForTicketProcessed(body.ticket.id);
 
   return {
     id: body.ticket.id,

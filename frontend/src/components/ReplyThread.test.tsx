@@ -44,6 +44,18 @@ describe('ReplyThread', () => {
     expect(screen.getByText('(Customer)')).toBeInTheDocument()
   })
 
+  it('labels an AI reply as coming from the support team, not the requester', () => {
+    const reply: Reply = { ...baseReply, senderType: 'ai', author: null }
+
+    renderWithProviders(
+      <ReplyThread replies={[reply]} requesterName="Rae Requester" requesterEmail="requester@test.com" />
+    )
+
+    expect(screen.getByText(/Support Team/)).toBeInTheDocument()
+    expect(screen.getByText('(AI)')).toBeInTheDocument()
+    expect(screen.queryByText(/Rae Requester/)).not.toBeInTheDocument()
+  })
+
   it('falls back to the requester email when there is no author or requester name', () => {
     const reply: Reply = { ...baseReply, senderType: 'customer', author: null }
 

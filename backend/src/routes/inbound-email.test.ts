@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 import { prisma } from '../db.js';
-import { classifyTicketInBackground } from '../jobs/classify-ticket-job.js';
+import { processTicketInBackground, followUpTicketInBackground } from '../jobs/process-ticket-job.js';
+import { TicketStatus } from '../generated/prisma/enums.js';
 
 vi.mock('../db.js', () => ({
   prisma: {
@@ -10,8 +11,9 @@ vi.mock('../db.js', () => ({
   },
 }));
 
-vi.mock('../jobs/classify-ticket-job.js', () => ({
-  classifyTicketInBackground: vi.fn(),
+vi.mock('../jobs/process-ticket-job.js', () => ({
+  processTicketInBackground: vi.fn(),
+  followUpTicketInBackground: vi.fn(),
 }));
 
 vi.mock('../middleware/require-webhook-secret.js', () => ({
@@ -21,7 +23,8 @@ vi.mock('../middleware/require-webhook-secret.js', () => ({
 const mockedFindMany = vi.mocked(prisma.ticket.findMany);
 const mockedCreate = vi.mocked(prisma.ticket.create);
 const mockedUpdate = vi.mocked(prisma.ticket.update);
-const mockedClassifyTicketInBackground = vi.mocked(classifyTicketInBackground);
+const mockedProcessTicketInBackground = vi.mocked(processTicketInBackground);
+const mockedFollowUpTicketInBackground = vi.mocked(followUpTicketInBackground);
 
 async function buildApp() {
   const { inboundEmailRouter } = await import('./inbound-email.js');
@@ -43,11 +46,12 @@ beforeEach(() => {
   mockedFindMany.mockReset();
   mockedCreate.mockReset();
   mockedUpdate.mockReset();
-  mockedClassifyTicketInBackground.mockReset();
+  mockedProcessTicketInBackground.mockReset();
+  mockedFollowUpTicketInBackground.mockReset();
 });
 
 describe('POST /api/inbound-email', () => {
-  it('queues classification for a newly created ticket with its first message', async () => {
+  it('queues AI processing for a newly created ticket with its first message', async () => {
     mockedFindMany.mockResolvedValue([]);
     const createdTicket = {
       id: 'ticket-1',
@@ -60,17 +64,35 @@ describe('POST /api/inbound-email', () => {
     const res = await request(app).post('/api/inbound-email').send(payload);
 
     expect(res.status).toBe(201);
-    expect(mockedClassifyTicketInBackground).toHaveBeenCalledWith(createdTicket, createdTicket.messages[0]);
+    expect(mockedProcessTicketInBackground).toHaveBeenCalledWith(createdTicket, createdTicket.messages[0]);
+    expect(mockedFollowUpTicketInBackground).not.toHaveBeenCalled();
   });
 
-  it('does not queue classification when the message is appended to an existing open ticket', async () => {
-    mockedFindMany.mockResolvedValue([{ id: 'ticket-1', subject: 'Refund request' }] as never);
+  it('queues nothing when the message is appended to an existing open ticket', async () => {
+    mockedFindMany.mockResolvedValue([
+      { id: 'ticket-1', subject: 'Refund request', status: TicketStatus.open },
+    ] as never);
     mockedUpdate.mockResolvedValueOnce({ id: 'ticket-1', messages: [] } as never);
     const app = await buildApp();
 
     const res = await request(app).post('/api/inbound-email').send(payload);
 
     expect(res.status).toBe(201);
-    expect(mockedClassifyTicketInBackground).not.toHaveBeenCalled();
+    expect(mockedProcessTicketInBackground).not.toHaveBeenCalled();
+    expect(mockedFollowUpTicketInBackground).not.toHaveBeenCalled();
+  });
+
+  it('queues a follow-up check when the message is appended to a resolved ticket', async () => {
+    mockedFindMany.mockResolvedValue([
+      { id: 'ticket-1', subject: 'Refund request', status: TicketStatus.resolved },
+    ] as never);
+    mockedUpdate.mockResolvedValueOnce({ id: 'ticket-1', messages: [] } as never);
+    const app = await buildApp();
+
+    const res = await request(app).post('/api/inbound-email').send({ ...payload, subject: 'Re: Refund request' });
+
+    expect(res.status).toBe(201);
+    expect(mockedProcessTicketInBackground).not.toHaveBeenCalled();
+    expect(mockedFollowUpTicketInBackground).toHaveBeenCalledWith('ticket-1', 'I want my money back');
   });
 });

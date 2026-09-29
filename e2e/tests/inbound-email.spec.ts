@@ -1,5 +1,10 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
-import { closeTicket, deleteTicket, findTicketsByRequesterEmail } from './helpers/tickets-db.js';
+import {
+  closeTicket,
+  deleteTicket,
+  findTicketsByRequesterEmail,
+  waitForTicketProcessed,
+} from './helpers/tickets-db.js';
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -45,7 +50,7 @@ type TicketMessage = {
 type Ticket = {
   id: string;
   subject: string;
-  status: 'open' | 'resolved' | 'closed';
+  status: 'new' | 'processing' | 'open' | 'resolved' | 'closed';
   category: string | null;
   requesterEmail: string;
   requesterName: string | null;
@@ -61,7 +66,7 @@ function postInboundEmail(
 }
 
 test.describe('Inbound email webhook', () => {
-  test('valid payload creates a new open ticket with the first message', async ({ request }) => {
+  test('valid payload creates a new ticket with the first message', async ({ request }) => {
     const suffix = randomLetters(8);
     const payload: InboundEmailPayload = {
       from: `requester-${suffix}@e2e.test`,
@@ -81,7 +86,9 @@ test.describe('Inbound email webhook', () => {
 
       expect(body.ticket.requesterEmail).toBe(payload.from);
       expect(body.ticket.subject).toBe(payload.subject);
-      expect(body.ticket.status).toBe('open');
+      // Freshly created tickets start "new" — the process-ticket background job
+      // moves them to processing, then open/resolved, asynchronously.
+      expect(body.ticket.status).toBe('new');
       expect(body.ticket.messages).toHaveLength(1);
       expect(body.ticket.messages[0].body).toBe(payload.text);
       expect(body.ticket.messages[0].fromEmail).toBe(payload.from);
@@ -244,6 +251,12 @@ test.describe('Inbound email webhook', () => {
         const body = (await response.json()) as { ticket: Ticket };
         firstTicketId = body.ticket.id;
 
+        // Wait for the background job to finish with this ticket before forcing it
+        // closed directly in the DB — otherwise the job (still in flight, unaware of
+        // our direct update) can finish afterwards and overwrite "closed" with
+        // "open"/"resolved", which would make the next step match onto this ticket
+        // instead of creating a new one.
+        await waitForTicketProcessed(firstTicketId);
         await closeTicket(firstTicketId);
       });
 
@@ -259,7 +272,8 @@ test.describe('Inbound email webhook', () => {
         secondTicketId = body.ticket.id;
 
         expect(body.ticket.id).not.toBe(firstTicketId);
-        expect(body.ticket.status).toBe('open');
+        // Freshly created ticket — starts "new", same as any other webhook-created ticket.
+        expect(body.ticket.status).toBe('new');
         expect(body.ticket.messages).toHaveLength(1);
         expect(body.ticket.messages[0].body).toBe('Follow-up after close.');
       });

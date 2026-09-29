@@ -110,6 +110,24 @@ describe('TicketDetails', () => {
     })
   })
 
+  it('does not offer the AI pipeline statuses as options', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(<TicketDetails ticket={baseTicket} isAdmin={false} agents={[]} />)
+
+    await user.click(screen.getByRole('combobox', { name: /ticket status/i }))
+
+    const options = await screen.findAllByRole('option')
+    expect(options.map((option) => option.textContent)).toEqual(['Open', 'Resolved', 'Closed'])
+  })
+
+  it('shows the label of a ticket still being processed by the AI', () => {
+    renderWithProviders(
+      <TicketDetails ticket={{ ...baseTicket, status: 'processing' }} isAdmin={false} agents={[]} />
+    )
+
+    expect(screen.getByRole('combobox', { name: /ticket status/i })).toHaveTextContent('Processing')
+  })
+
   it('shows an error when updating the status fails', async () => {
     mockedApiPatch.mockRejectedValue(new ApiError(400, 'Cannot reopen a closed ticket'))
     const user = userEvent.setup()
