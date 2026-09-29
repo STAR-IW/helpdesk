@@ -5,6 +5,7 @@ import { requireWebhookSecret } from '../middleware/require-webhook-secret.js';
 import { Prisma } from '../generated/prisma/client.js';
 import { TicketStatus } from '../generated/prisma/enums.js';
 import { sanitizeHtml } from '../sanitize.js';
+import { getAiAgentIdIfSeeded } from '../ai-agent.js';
 import { processTicketInBackground, followUpTicketInBackground } from '../jobs/process-ticket-job.js';
 
 export const inboundEmailRouter = Router();
@@ -67,7 +68,14 @@ inboundEmailRouter.post('/', requireWebhookSecret, async (req, res) => {
           include: { messages: true },
         })
       : await prisma.ticket.create({
-          data: { subject, requesterEmail: from, requesterName: fromName, messages: { create: messageData } },
+          data: {
+            subject,
+            requesterEmail: from,
+            requesterName: fromName,
+            // New tickets belong to the AI agent until the pipeline resolves or hands them off.
+            assignedAgentId: await getAiAgentIdIfSeeded(),
+            messages: { create: messageData },
+          },
           include: { messages: true },
         });
 

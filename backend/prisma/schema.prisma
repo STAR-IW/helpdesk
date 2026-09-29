@@ -126,6 +126,7 @@ model Ticket {
   assignedAgent   User?           @relation(fields: [assignedAgentId], references: [id])
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
+  resolvedAt      DateTime?
   messages        Message[]
   replies         Reply[]
 

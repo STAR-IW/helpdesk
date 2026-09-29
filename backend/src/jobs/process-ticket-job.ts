@@ -3,6 +3,7 @@ import { prisma } from '../db.js';
 import { classifyTicket } from '../ai/classify-ticket.js';
 import { autoResolveTicket } from '../ai/auto-resolve-ticket.js';
 import { isAcknowledgementOnly } from '../ai/is-acknowledgement.js';
+import { AI_AGENT_ID } from '../ai-agent.js';
 import { SenderType, TicketStatus } from '../generated/prisma/enums.js';
 import type { TicketCategory } from '../generated/prisma/enums.js';
 import type { Ticket, Message } from '../generated/prisma/client.js';
@@ -23,7 +24,8 @@ type FollowUpTicketJobData = {
 };
 
 // Moves a new ticket through the AI pipeline: new -> processing -> classified ->
-// resolved (answered from the knowledge base) or open (handed to an agent).
+// resolved (answered from the knowledge base, stays assigned to the AI agent) or open
+// (unassigned from the AI agent and handed to the human queue).
 // Status changes use updateMany guarded on the expected current status, so they never
 // throw when the ticket was deleted meanwhile, and never overwrite a manual change.
 async function processTicket({ ticketId, subject, body, requesterName }: ProcessTicketJobData): Promise<void> {
@@ -49,7 +51,7 @@ async function processTicket({ ticketId, subject, body, requesterName }: Process
       await prisma.$transaction(async (tx) => {
         const resolved = await tx.ticket.updateMany({
           where: { id: ticketId, status: TicketStatus.processing },
-          data: { status: TicketStatus.resolved },
+          data: { status: TicketStatus.resolved, resolvedAt: new Date() },
         });
         if (resolved.count === 1) {
           await tx.reply.create({ data: { ticketId, senderType: SenderType.ai, body: reply } });
@@ -67,10 +69,21 @@ async function processTicket({ ticketId, subject, body, requesterName }: Process
     where: { id: ticketId, status: { in: [TicketStatus.new, TicketStatus.processing] } },
     data: { status: TicketStatus.open },
   });
+  await unassignFromAiAgent(ticketId);
+}
+
+// Hands an open ticket back to the human queue. Guarded on the AI agent still being
+// the assignee, so a manual reassignment by an admin is never overwritten.
+async function unassignFromAiAgent(ticketId: string): Promise<void> {
+  await prisma.ticket.updateMany({
+    where: { id: ticketId, assignedAgentId: AI_AGENT_ID, status: TicketStatus.open },
+    data: { assignedAgentId: null },
+  });
 }
 
 // Reopens a resolved ticket when the customer's follow-up needs a response. A plain
-// "thanks" keeps it resolved; if the AI check fails, reopen to be safe.
+// "thanks" keeps it resolved; if the AI check fails, reopen to be safe. A reopened
+// ticket needs a human, so it's also taken away from the AI agent.
 async function followUpTicket({ ticketId, body }: FollowUpTicketJobData): Promise<void> {
   try {
     if (await isAcknowledgementOnly(body)) return;
@@ -80,8 +93,9 @@ async function followUpTicket({ ticketId, body }: FollowUpTicketJobData): Promis
 
   await prisma.ticket.updateMany({
     where: { id: ticketId, status: TicketStatus.resolved },
-    data: { status: TicketStatus.open },
+    data: { status: TicketStatus.open, resolvedAt: null },
   });
+  await unassignFromAiAgent(ticketId);
 }
 
 export async function registerTicketWorkers(): Promise<void> {

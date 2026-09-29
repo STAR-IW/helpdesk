@@ -6,6 +6,7 @@ import { prisma } from '../db.js';
 import { requireAuth, requireAdmin } from '../middleware/require-auth.js';
 import { Role } from '../generated/prisma/enums.js';
 import { Prisma } from '../generated/prisma/client.js';
+import { AI_AGENT_ID } from '../ai-agent.js';
 
 export const usersRouter = Router();
 
@@ -94,6 +95,11 @@ usersRouter.patch<{ id: string }>('/:id', requireAuth, requireAdmin, async (req,
   const { name, email, password } = parsed.data;
   const { id } = req.params;
 
+  if (id === AI_AGENT_ID) {
+    res.status(403).json({ error: "The AI agent can't be modified" });
+    return;
+  }
+
   try {
     const user = await prisma.$transaction(async (tx) => {
       const updated = await tx.user.update({
@@ -132,6 +138,11 @@ usersRouter.patch<{ id: string }>('/:id', requireAuth, requireAdmin, async (req,
 
 usersRouter.delete<{ id: string }>('/:id', requireAuth, requireAdmin, async (req, res) => {
   const { id } = req.params;
+
+  if (id === AI_AGENT_ID) {
+    res.status(403).json({ error: "The AI agent can't be modified" });
+    return;
+  }
 
   const user = await prisma.user.findUnique({
     where: { id },

@@ -6,6 +6,7 @@ import { TicketStatus, TicketCategory, Role, SenderType } from '../generated/pri
 import { Prisma } from '../generated/prisma/client.js';
 import { polishReply } from '../ai/polish-reply.js';
 import { summarizeTicket } from '../ai/summarize-ticket.js';
+import { AI_AGENT_ID } from '../ai-agent.js';
 
 export const ticketsRouter = Router();
 
@@ -279,6 +280,11 @@ ticketsRouter.patch<{ id: string }>('/:id', requireAuth, async (req, res) => {
   }
 
   if (agentId) {
+    // The AI agent only owns tickets through the AI pipeline, never by manual assignment.
+    if (agentId === AI_AGENT_ID) {
+      res.status(400).json({ error: "Tickets can't be manually assigned to the AI agent" });
+      return;
+    }
     const agent = await prisma.user.findUnique({
       where: { id: agentId },
       select: { deletedAt: true },
@@ -289,11 +295,25 @@ ticketsRouter.patch<{ id: string }>('/:id', requireAuth, async (req, res) => {
     }
   }
 
+  // resolvedAt records when a ticket was first resolved (or closed); moving between
+  // resolved and closed keeps it, reopening clears it.
+  let resolvedAt: Date | null | undefined;
+  if (status === TicketStatus.open) {
+    resolvedAt = null;
+  } else if (status === TicketStatus.resolved || status === TicketStatus.closed) {
+    const current = await prisma.ticket.findUnique({ where: { id }, select: { resolvedAt: true } });
+    if (!current) {
+      res.status(404).json({ error: 'Ticket not found' });
+      return;
+    }
+    resolvedAt = current.resolvedAt ?? new Date();
+  }
+
   try {
     const ticket = await prisma.ticket.update({
       where: { id },
       data: {
-        ...(status !== undefined && { status }),
+        ...(status !== undefined && { status, resolvedAt }),
         ...(category !== undefined && { category }),
         ...(agentId !== undefined && { assignedAgentId: agentId }),
       },

@@ -2,11 +2,14 @@ import '../src/load-env.js';
 import { randomUUID } from 'node:crypto';
 import { hashPassword } from 'better-auth/crypto';
 import { prisma } from '../src/db.js';
+import { AI_AGENT_ID, AI_AGENT_EMAIL, AI_AGENT_NAME } from '../src/ai-agent.js';
 import { Role, TicketStatus, TicketCategory, SenderType } from '../src/generated/prisma/enums.js';
 
 const SUPPORT_EMAIL = 'support@ashcombe.edu';
 const AGENT_SEED_PASSWORD = 'AgentPass123!';
 const TOTAL_TICKETS = 100;
+// Share of resolved/closed seed tickets that were auto-resolved by the AI agent.
+const AI_RESOLVED_SHARE = 0.3;
 
 const AGENTS = [
   { name: 'Maria Chen', email: 'maria.chen@ashcombe.edu' },
@@ -332,7 +335,30 @@ async function seedAgents(): Promise<{ id: string; name: string; email: string }
   return records;
 }
 
-async function seedTickets(agentRecords: { id: string; name: string; email: string }[]) {
+// The AI agent is a login-less user (no credential account) that the AI pipeline
+// assigns new tickets to while it tries to auto-resolve them.
+async function seedAiAgent(): Promise<{ id: string }> {
+  const existing = await prisma.user.findUnique({ where: { id: AI_AGENT_ID } });
+  if (existing) {
+    console.log(`AI agent ${AI_AGENT_EMAIL} already exists, skipping.`);
+    return { id: existing.id };
+  }
+
+  const user = await prisma.user.create({
+    data: {
+      id: AI_AGENT_ID,
+      name: AI_AGENT_NAME,
+      email: AI_AGENT_EMAIL,
+      emailVerified: true,
+      role: Role.agent,
+    },
+  });
+
+  console.log(`Created AI agent ${user.email} (${user.id})`);
+  return { id: user.id };
+}
+
+async function seedTickets(agentRecords: { id: string; name: string; email: string }[], aiAgent: { id: string }) {
   const existingCount = await prisma.ticket.count();
   if (existingCount > 0) {
     console.log(`Found ${existingCount} existing ticket(s), skipping ticket seed.`);
@@ -351,6 +377,7 @@ async function seedTickets(agentRecords: { id: string; name: string; email: stri
     const status =
       statusRoll < 0.35 ? TicketStatus.open : statusRoll < 0.7 ? TicketStatus.resolved : TicketStatus.closed;
 
+    const resolvedByAi = status !== TicketStatus.open && Math.random() < AI_RESOLVED_SHARE;
     const needsAgent = status !== TicketStatus.open || Math.random() < 0.55;
     const assignedAgent = needsAgent ? randomFrom(agentRecords) : null;
 
@@ -367,11 +394,16 @@ async function seedTickets(agentRecords: { id: string; name: string; email: stri
       },
     ];
 
-    const replies: { senderType: SenderType; authorId: string; body: string; createdAt: Date }[] = [];
+    const replies: { senderType: SenderType; authorId?: string; body: string; createdAt: Date }[] = [];
     let lastActivity = createdAt;
+    let resolvedAt: Date | null = null;
 
-    if (status !== TicketStatus.open && assignedAgent) {
-      const resolvedAt = addHours(createdAt, randomInt(3, 96));
+    if (resolvedByAi) {
+      resolvedAt = new Date(createdAt.getTime() + randomInt(20, 180) * 1000);
+      replies.push({ senderType: SenderType.ai, body: rendered.resolution, createdAt: resolvedAt });
+      lastActivity = resolvedAt;
+    } else if (status !== TicketStatus.open && assignedAgent) {
+      resolvedAt = addHours(createdAt, randomInt(3, 96));
       replies.push({
         senderType: SenderType.agent,
         authorId: assignedAgent.id,
@@ -397,9 +429,10 @@ async function seedTickets(agentRecords: { id: string; name: string; email: stri
         category,
         requesterEmail: student.email,
         requesterName: student.name,
-        assignedAgentId: assignedAgent?.id ?? null,
+        assignedAgentId: resolvedByAi ? aiAgent.id : (assignedAgent?.id ?? null),
         createdAt,
         updatedAt: lastActivity,
+        resolvedAt,
         messages: { create: messages },
         replies: { create: replies },
       },
@@ -416,7 +449,8 @@ async function seedTickets(agentRecords: { id: string; name: string; email: stri
 async function main() {
   await seedAdmin();
   const agentRecords = await seedAgents();
-  await seedTickets(agentRecords);
+  const aiAgent = await seedAiAgent();
+  await seedTickets(agentRecords, aiAgent);
   console.log(`\nSeed agent login password (for any newly created agents): ${AGENT_SEED_PASSWORD}`);
 }
 

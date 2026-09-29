@@ -6,6 +6,7 @@ import { auth } from './auth.js';
 import { usersRouter } from './routes/users.js';
 import { inboundEmailRouter } from './routes/inbound-email.js';
 import { ticketsRouter } from './routes/tickets.js';
+import { dashboardRouter } from './routes/dashboard.js';
 import { boss } from './jobs/boss.js';
 import { registerTicketWorkers } from './jobs/process-ticket-job.js';
 
@@ -27,6 +28,7 @@ app.get('/api/health', (_req, res) => {
 
 app.use('/api/users', usersRouter);
 app.use('/api/tickets', ticketsRouter);
+app.use('/api/dashboard', dashboardRouter);
 app.use('/api/webhooks/inbound-email', inboundEmailRouter);
 
 app.listen(port, () => {
