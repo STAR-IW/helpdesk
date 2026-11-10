@@ -5,6 +5,7 @@ import { autoResolveTicket } from '../ai/auto-resolve-ticket.js';
 import { isAcknowledgementOnly } from '../ai/is-acknowledgement.js';
 import { fromPrisma } from 'pg-boss';
 import { boss } from './boss.js';
+import { AI_AGENT_ID } from '../ai-agent.js';
 import {
   enqueueProcessTicket,
   enqueueFollowUpTicket,
@@ -153,7 +154,7 @@ describe('process-ticket worker', () => {
   };
   const toResolved = {
     where: { id: 'ticket-1', status: TicketStatus.processing },
-    data: { status: TicketStatus.resolved },
+    data: { status: TicketStatus.resolved, resolvedAt: expect.any(Date) },
   };
 
   beforeEach(() => {
@@ -194,7 +195,11 @@ describe('process-ticket worker', () => {
     await handler([processJob]);
 
     expect(mockedTransaction).not.toHaveBeenCalled();
-    expect(mockedUpdateMany).toHaveBeenLastCalledWith(toOpen);
+    expect(mockedUpdateMany).toHaveBeenCalledWith(toOpen);
+    expect(mockedUpdateMany).toHaveBeenLastCalledWith({
+      where: { id: 'ticket-1', assignedAgentId: AI_AGENT_ID, status: TicketStatus.open },
+      data: { assignedAgentId: null },
+    });
   });
 
   it('opens the ticket when auto-resolution throws', async () => {
@@ -206,8 +211,11 @@ describe('process-ticket worker', () => {
     await handler([processJob]);
 
     expect(mockedTransaction).not.toHaveBeenCalled();
-    expect(mockedUpdateMany).toHaveBeenLastCalledWith(toOpen);
-    consoleError.mockRestore();
+    expect(mockedUpdateMany).toHaveBeenCalledWith(toOpen);
+    expect(mockedUpdateMany).toHaveBeenLastCalledWith({
+      where: { id: 'ticket-1', assignedAgentId: AI_AGENT_ID, status: TicketStatus.open },
+      data: { assignedAgentId: null },
+    });    consoleError.mockRestore();
   });
 
   it('still attempts auto-resolution without a category when classification fails', async () => {
@@ -272,8 +280,7 @@ describe('follow-up-ticket worker', () => {
 
     expect(mockedUpdateMany).toHaveBeenCalledWith({
       where: { id: 'ticket-1', status: TicketStatus.resolved },
-      data: { status: TicketStatus.open },
-    });
+      data: { status: TicketStatus.open, resolvedAt: null },    });
   });
 
   it('reopens the ticket when the acknowledgement check throws', async () => {
@@ -285,8 +292,7 @@ describe('follow-up-ticket worker', () => {
 
     expect(mockedUpdateMany).toHaveBeenCalledWith({
       where: { id: 'ticket-1', status: TicketStatus.resolved },
-      data: { status: TicketStatus.open },
-    });
+      data: { status: TicketStatus.open, resolvedAt: null },      });
     consoleError.mockRestore();
   });
 });
