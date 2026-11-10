@@ -31,6 +31,10 @@ app.use('/api/tickets', ticketsRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/webhooks/inbound-email', inboundEmailRouter);
 
-app.listen(port, () => {
+app.listen(port, (err) => {
+  if (err) {
+    console.error('Failed to start server:', err);
+    process.exit(1);
+  }
   console.log(`Backend listening on http://localhost:${port}`);
 });
