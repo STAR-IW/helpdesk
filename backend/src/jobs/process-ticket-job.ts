@@ -1,3 +1,5 @@
+import { fromPrisma } from 'pg-boss';
+import type { PrismaTransactionLike } from 'pg-boss';
 import { boss } from './boss.js';
 import { prisma } from '../db.js';
 import { classifyTicket } from '../ai/classify-ticket.js';
@@ -106,24 +108,30 @@ export async function registerTicketWorkers(): Promise<void> {
   await boss.work<FollowUpTicketJobData>(FOLLOW_UP_TICKET_QUEUE, ([job]) => followUpTicket(job.data));
 }
 
-// Enqueues AI processing for a newly created ticket without waiting on the AI calls
-// (a pg-boss worker processes the job separately) or on the enqueue itself.
-export function processTicketInBackground(ticket: Ticket, message: Message): void {
+// The enqueue functions take the caller's Prisma interactive-transaction client, so the
+// job row is inserted in the same Postgres transaction as the ticket write: both commit
+// or neither does, and a ticket can never be left in `new` with no job to process it.
+// Typed as pg-boss's PrismaTransactionLike (what fromPrisma accepts — just
+// $queryRawUnsafe) rather than Prisma.TransactionClient, because our client is built
+// with $extends and its tx type is the extended one, not the base TransactionClient.
+
+// Enqueues AI processing for a newly created ticket. No singletonKey: on our `standard`
+// queues pg-boss doesn't enforce it (its unique indexes only cover the
+// short/singleton/stately/exclusive/key_strict_fifo policies, or singletonSeconds
+// throttling). A duplicate job is harmless anyway — processTicket's `status: new` guard
+// makes any second run a no-op.
+export async function enqueueProcessTicket(tx: PrismaTransactionLike, ticket: Ticket, message: Message): Promise<void> {
   const data: ProcessTicketJobData = {
     ticketId: ticket.id,
     subject: ticket.subject,
     body: message.body,
     requesterName: ticket.requesterName,
   };
-  boss.send(PROCESS_TICKET_QUEUE, data).catch((err) => {
-    console.error(`Failed to enqueue processing for ticket ${ticket.id}`, err);
-  });
+  await boss.send(PROCESS_TICKET_QUEUE, data, { db: fromPrisma(tx) });
 }
 
 // Enqueues a check of a customer's follow-up to a resolved ticket.
-export function followUpTicketInBackground(ticketId: string, body: string): void {
+export async function enqueueFollowUpTicket(tx: PrismaTransactionLike, ticketId: string, body: string): Promise<void> {
   const data: FollowUpTicketJobData = { ticketId, body };
-  boss.send(FOLLOW_UP_TICKET_QUEUE, data).catch((err) => {
-    console.error(`Failed to enqueue follow-up check for ticket ${ticketId}`, err);
-  });
+  await boss.send(FOLLOW_UP_TICKET_QUEUE, data, { db: fromPrisma(tx) });
 }

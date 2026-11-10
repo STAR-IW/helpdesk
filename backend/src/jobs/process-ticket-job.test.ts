@@ -3,10 +3,11 @@ import { prisma } from '../db.js';
 import { classifyTicket } from '../ai/classify-ticket.js';
 import { autoResolveTicket } from '../ai/auto-resolve-ticket.js';
 import { isAcknowledgementOnly } from '../ai/is-acknowledgement.js';
+import { fromPrisma } from 'pg-boss';
 import { boss } from './boss.js';
 import {
-  processTicketInBackground,
-  followUpTicketInBackground,
+  enqueueProcessTicket,
+  enqueueFollowUpTicket,
   registerTicketWorkers,
   PROCESS_TICKET_QUEUE,
   FOLLOW_UP_TICKET_QUEUE,
@@ -36,6 +37,13 @@ vi.mock('../ai/is-acknowledgement.js', () => ({
 vi.mock('./boss.js', () => ({
   boss: { send: vi.fn(), createQueue: vi.fn(), work: vi.fn() },
 }));
+
+vi.mock('pg-boss', () => ({
+  fromPrisma: vi.fn((tx: unknown) => ({ wrapped: tx })),
+}));
+
+const tx = { $queryRawUnsafe: vi.fn() };
+const mockedFromPrisma = vi.mocked(fromPrisma);
 
 const mockedUpdate = vi.mocked(prisma.ticket.update);
 const mockedUpdateMany = vi.mocked(prisma.ticket.updateMany);
@@ -74,45 +82,54 @@ beforeEach(() => {
   mockedWork.mockReset().mockResolvedValue('worker-1');
 });
 
-describe('processTicketInBackground', () => {
-  it('enqueues a processing job with the ticket id, subject, requester name, and message body', () => {
+describe('enqueueProcessTicket', () => {
+  it('enqueues a processing job on the caller transaction with the ticket id, subject, requester name, and message body', async () => {
     mockedSend.mockResolvedValue('job-1');
 
-    processTicketInBackground(
+    await enqueueProcessTicket(
+      tx,
       { id: 'ticket-1', subject: 'Refund request', requesterName: 'Jane' } as never,
       { body: 'I want my money back' } as never
     );
 
-    expect(mockedSend).toHaveBeenCalledWith(PROCESS_TICKET_QUEUE, {
-      ticketId: 'ticket-1',
-      subject: 'Refund request',
-      body: 'I want my money back',
-      requesterName: 'Jane',
-    });
+    expect(mockedFromPrisma).toHaveBeenCalledWith(tx);
+    expect(mockedSend).toHaveBeenCalledWith(
+      PROCESS_TICKET_QUEUE,
+      { ticketId: 'ticket-1', subject: 'Refund request', body: 'I want my money back', requesterName: 'Jane' },
+      { db: { wrapped: tx } }
+    );
   });
 
-  it('logs and does not throw when enqueueing fails', async () => {
+  it('rejects when enqueueing fails, so the caller transaction rolls back', async () => {
     mockedSend.mockRejectedValue(new Error('upstream failure'));
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-    processTicketInBackground(
-      { id: 'ticket-1', subject: 'Refund request', requesterName: null } as never,
-      { body: 'I want my money back' } as never
-    );
-    await new Promise((resolve) => setImmediate(resolve));
-
-    expect(consoleError).toHaveBeenCalledWith('Failed to enqueue processing for ticket ticket-1', expect.any(Error));
-    consoleError.mockRestore();
+    await expect(
+      enqueueProcessTicket(
+        tx,
+        { id: 'ticket-1', subject: 'Refund request', requesterName: null } as never,
+        { body: 'I want my money back' } as never
+      )
+    ).rejects.toThrow('upstream failure');
   });
 });
 
-describe('followUpTicketInBackground', () => {
-  it('enqueues a follow-up job with the ticket id and message body', () => {
+describe('enqueueFollowUpTicket', () => {
+  it('enqueues a follow-up job on the caller transaction with the ticket id and message body', async () => {
     mockedSend.mockResolvedValue('job-1');
 
-    followUpTicketInBackground('ticket-1', 'Thanks!');
+    await enqueueFollowUpTicket(tx, 'ticket-1', 'Thanks!');
 
-    expect(mockedSend).toHaveBeenCalledWith(FOLLOW_UP_TICKET_QUEUE, { ticketId: 'ticket-1', body: 'Thanks!' });
+    expect(mockedSend).toHaveBeenCalledWith(
+      FOLLOW_UP_TICKET_QUEUE,
+      { ticketId: 'ticket-1', body: 'Thanks!' },
+      { db: { wrapped: tx } }
+    );
+  });
+
+  it('rejects when enqueueing fails', async () => {
+    mockedSend.mockRejectedValue(new Error('upstream failure'));
+
+    await expect(enqueueFollowUpTicket(tx, 'ticket-1', 'Thanks!')).rejects.toThrow('upstream failure');
   });
 });
 

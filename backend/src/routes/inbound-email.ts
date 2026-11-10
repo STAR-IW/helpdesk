@@ -6,7 +6,7 @@ import { Prisma } from '../generated/prisma/client.js';
 import { TicketStatus } from '../generated/prisma/enums.js';
 import { sanitizeHtml } from '../sanitize.js';
 import { getAiAgentIdIfSeeded } from '../ai-agent.js';
-import { processTicketInBackground, followUpTicketInBackground } from '../jobs/process-ticket-job.js';
+import { enqueueProcessTicket, enqueueFollowUpTicket } from '../jobs/process-ticket-job.js';
 
 export const inboundEmailRouter = Router();
 
@@ -61,29 +61,38 @@ inboundEmailRouter.post('/', requireWebhookSecret, async (req, res) => {
     });
     const existingTicket = openTickets.find((t) => normalizeSubject(t.subject) === normalizedSubject);
 
-    const ticket = existingTicket
-      ? await prisma.ticket.update({
+    // New tickets belong to the AI agent until the pipeline resolves or hands them off.
+    const assignedAgentId = existingTicket ? null : await getAiAgentIdIfSeeded();
+
+    // The ticket write and its job enqueue share one transaction, so a failed enqueue
+    // rolls the ticket back (500 -> the email provider retries) instead of leaving it
+    // stuck in `new` with no job.
+    const ticket = await prisma.$transaction(async (tx) => {
+      if (existingTicket) {
+        const updated = await tx.ticket.update({
           where: { id: existingTicket.id },
           data: { messages: { create: messageData } },
           include: { messages: true },
-        })
-      : await prisma.ticket.create({
-          data: {
-            subject,
-            requesterEmail: from,
-            requesterName: fromName,
-            // New tickets belong to the AI agent until the pipeline resolves or hands them off.
-            assignedAgentId: await getAiAgentIdIfSeeded(),
-            messages: { create: messageData },
-          },
-          include: { messages: true },
-        });
+      });
+        if (existingTicket.status === TicketStatus.resolved) {
+          await enqueueFollowUpTicket(tx, updated.id, text);
+        }
+        return updated;
+      }
 
-    if (!existingTicket) {
-      processTicketInBackground(ticket, ticket.messages[0]);
-    } else if (existingTicket.status === TicketStatus.resolved) {
-      followUpTicketInBackground(ticket.id, text);
-    }
+      const created = await tx.ticket.create({
+        data: {
+          subject,
+          requesterEmail: from,
+          requesterName: fromName,
+          assignedAgentId,
+          messages: { create: messageData },
+        },
+        include: { messages: true },
+      });
+      await enqueueProcessTicket(tx, created, created.messages[0]);
+      return created;
+    });
 
     res.status(201).json({ ticket });
   } catch (err) {
