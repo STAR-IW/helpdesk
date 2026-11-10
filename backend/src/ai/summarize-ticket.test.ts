@@ -36,14 +36,16 @@ describe('summarizeTicket', () => {
     ]);
 
     const call = mockedGenerateText.mock.calls[0][0];
+    expect(typeof call.prompt).toBe('string');
+    const prompt = call.prompt as string;
     expect(call.model).toBe('mock-model');
-    expect(call.prompt).toContain('Ticket subject: Refund request');
-    expect(call.prompt).toContain('Rae Requester');
-    expect(call.prompt).toContain('I want a refund');
-    expect(call.prompt).toContain('Alice Agent');
-    expect(call.prompt).toContain('Sure, processing it now');
-    expect(call.prompt.indexOf('I want a refund')).toBeLessThan(
-      call.prompt.indexOf('Sure, processing it now')
+    expect(prompt).toContain('Ticket subject: Refund request');
+    expect(prompt).toContain('Rae Requester');
+    expect(prompt).toContain('I want a refund');
+    expect(prompt).toContain('Alice Agent');
+    expect(prompt).toContain('Sure, processing it now');
+    expect(prompt.indexOf('I want a refund')).toBeLessThan(
+        prompt.indexOf('Sure, processing it now')
     );
   });
 
